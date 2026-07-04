@@ -17,7 +17,15 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 
 
 def _conectar():
-    return psycopg.connect(DATABASE_URL, row_factory=psycopg.rows.dict_row, autocommit=True)
+    # prepare_threshold=None: el pooler de Supabase en modo "transaction" no
+    # soporta prepared statements entre transacciones (cada una puede caer en
+    # una conexión física distinta), así que los desactivamos por completo.
+    return psycopg.connect(
+        DATABASE_URL,
+        row_factory=psycopg.rows.dict_row,
+        autocommit=True,
+        prepare_threshold=None,
+    )
 
 
 def _asegurar_tabla():
