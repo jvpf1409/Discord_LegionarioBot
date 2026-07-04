@@ -81,6 +81,12 @@ def listar_eventos(guild_id: int, estado: str | None = None) -> list[dict]:
     return sorted(eventos, key=lambda e: int(e["id"]))
 
 
+def listar_todos_los_eventos() -> list[dict]:
+    """Todos los eventos de todos los servidores (para re-registrar vistas al iniciar)."""
+    data = cargar_datos()
+    return sorted(data["eventos"].values(), key=lambda e: int(e["id"]))
+
+
 def actualizar_evento(evento_id: str, **cambios):
     data = cargar_datos()
     evento_id = str(evento_id)

@@ -32,8 +32,7 @@ bot = commands.Bot(command_prefix="!wow ", intents=intents)
 async def on_ready():
     # Volver a registrar las vistas de todos los eventos no finalizados,
     # para que los botones sigan funcionando tras reiniciar el bot.
-    data = storage.cargar_datos()
-    for evento in data["eventos"].values():
+    for evento in storage.listar_todos_los_eventos():
         if evento["estado"] in ("abierto", "cerrado") and evento.get("mensaje_id"):
             abierto = evento["estado"] == "abierto"
             bot.add_view(EventoView(evento["id"], abierto=abierto), message_id=evento["mensaje_id"])

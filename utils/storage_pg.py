@@ -106,6 +106,13 @@ def listar_eventos(guild_id: int, estado: str | None = None) -> list[dict]:
     return eventos
 
 
+def listar_todos_los_eventos() -> list[dict]:
+    """Todos los eventos de todos los servidores (para re-registrar vistas al iniciar)."""
+    with _conectar() as conn:
+        filas = conn.execute("SELECT id, data FROM eventos ORDER BY id").fetchall()
+    return [_fila_a_evento(f) for f in filas]
+
+
 def actualizar_evento(evento_id: str, **cambios):
     with _conectar() as conn:
         with conn.transaction():
