@@ -80,7 +80,7 @@ función `es_organizador()`, por ejemplo para exigir un rol específico como "Of
 
 | Comando | Descripción |
 |---|---|
-| `/evento crear titulo descripcion tipo_inscripcion fecha hora canal_publicacion [num_equipos] [imagen] [canal_inscripciones]` | Publica el evento con embed + botones "Inscribirse" y "Darme de baja" |
+| `/evento crear titulo tipo_inscripcion fecha hora canal_publicacion [num_equipos] [imagen] [canal_inscripciones]` | Abre un formulario para la descripción y publica el evento con embed + botones |
 | `/evento cerrar evento_id` | Cierra inscripciones, deshabilita el botón |
 | `/evento generar_equipos evento_id [num_equipos]` | Solo para eventos **individuales**: genera y publica los equipos balanceados |
 | `/evento registrar_ganador evento_id numero_equipo` | Marca el equipo ganador y finaliza el evento |
@@ -103,16 +103,24 @@ función `es_organizador()`, por ejemplo para exigir un rol específico como "Of
 ### Fecha, hora e imagen
 
 Al crear el evento se piden `fecha` (formato `DD/MM/AAAA`) y `hora` (formato 24h `HH:MM`),
-interpretadas con la zona horaria de `ZONA_HORARIA` (variable de entorno, por defecto
-`America/Mexico_City`). Se muestran en el embed con el formato dinámico de Discord
-(`📅 Fecha y hora`), que cada usuario ve automáticamente en su propio huso horario, junto
-con el tiempo relativo ("en 3 días" / "hace 3 días"). También se puede adjuntar una
-`imagen` (banner, logo del jefe, etc.) que se muestra al final del embed.
+interpretadas con la zona horaria de `ZONA_HORARIA` (variable de entorno, CST/UTC-6 por
+defecto). Se muestran en el embed con el formato dinámico de Discord (`📅 Fecha y hora`),
+que cada usuario ve automáticamente en su propio huso horario, junto con el tiempo
+relativo ("en 3 días" / "hace 3 días"). También se puede adjuntar una `imagen` (banner,
+logo del jefe, etc.) que se muestra al final del embed.
+
+### La descripción se pide en un formulario aparte
+
+Los parámetros de un slash command son cajas de texto de una sola línea — Discord no
+permite saltos de línea ahí. Por eso, al ejecutar `/evento crear`, después de llenar los
+demás campos se abre un formulario (modal) con un campo de texto tipo párrafo para la
+**descripción**, que sí admite varias líneas y párrafos como los ves en Discord normalmente.
 
 ### Flujo típico
 
-1. Un oficial ejecuta `/evento crear titulo:"Mítico+ semanal" descripcion:"Trae tu build de M+" tipo_inscripcion:Individual num_equipos:2 canal_publicacion:#eventos canal_inscripciones:#inscripciones-log`.
-2. El bot publica el embed con botones en el canal elegido. Cada inscripción/baja se
+1. Un oficial ejecuta `/evento crear titulo:"Mítico+ semanal" tipo_inscripcion:Individual fecha:30/06/2026 hora:23:00 num_equipos:2 canal_publicacion:#eventos canal_inscripciones:#inscripciones-log`.
+2. Se abre un formulario para escribir la descripción (con saltos de línea) y al enviarlo
+   el bot publica el embed con botones en el canal elegido. Cada inscripción/baja se
    anuncia también en `canal_inscripciones` si se configuró, además de actualizar el embed.
 3. Cuando ya no se aceptan más inscritos: `/evento cerrar evento_id:1`.
 4. Si el evento es individual, el oficial genera los equipos: `/evento generar_equipos evento_id:1`.

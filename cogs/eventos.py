@@ -18,6 +18,78 @@ def es_organizador():
     return app_commands.checks.has_permissions(manage_guild=True)
 
 
+class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
+    """
+    Los parámetros de un slash command son campos de una sola línea (Discord no
+    permite saltos de línea ahí). Por eso la descripción se pide aparte, en un
+    modal con un campo tipo párrafo, que sí admite varias líneas.
+    """
+
+    descripcion = discord.ui.TextInput(
+        label="Descripción",
+        style=discord.TextStyle.paragraph,
+        placeholder="Detalles del evento",
+        max_length=1000,
+        required=True,
+    )
+
+    def __init__(
+        self,
+        *,
+        titulo: str,
+        tipo_inscripcion: str,
+        fecha_hora_ts: int,
+        canal_publicacion: discord.TextChannel,
+        num_equipos: int | None,
+        imagen_url: str | None,
+        canal_inscripciones_id: int | None,
+        guild_id: int,
+        creado_por: int,
+    ):
+        super().__init__()
+        self.titulo = titulo
+        self.tipo_inscripcion = tipo_inscripcion
+        self.fecha_hora_ts = fecha_hora_ts
+        self.canal_publicacion = canal_publicacion
+        self.num_equipos = num_equipos
+        self.imagen_url = imagen_url
+        self.canal_inscripciones_id = canal_inscripciones_id
+        self.guild_id = guild_id
+        self.creado_por = creado_por
+
+    async def on_submit(self, interaction: discord.Interaction):
+        evento_id = storage.crear_evento(
+            titulo=self.titulo,
+            descripcion=self.descripcion.value.strip(),
+            guild_id=self.guild_id,
+            canal_id=self.canal_publicacion.id,
+            num_equipos=self.num_equipos,
+            creado_por=self.creado_por,
+            fecha_hora_ts=self.fecha_hora_ts,
+            tipo_inscripcion=self.tipo_inscripcion,
+            canal_inscripciones_id=self.canal_inscripciones_id,
+            imagen_url=self.imagen_url,
+        )
+        evento = storage.obtener_evento(evento_id)
+        embed = construir_embed_evento(evento)
+        view = EventoView(evento_id, abierto=True)
+
+        try:
+            mensaje = await self.canal_publicacion.send(embed=embed, view=view)
+        except discord.Forbidden:
+            storage.actualizar_evento(evento_id, estado="finalizado")
+            await interaction.response.send_message(
+                f"❌ No tengo permiso para publicar en {self.canal_publicacion.mention}.", ephemeral=True
+            )
+            return
+
+        storage.actualizar_evento(evento_id, mensaje_id=mensaje.id)
+        await interaction.response.send_message(
+            f"✅ Evento **{self.titulo}** publicado en {self.canal_publicacion.mention} (ID: {evento_id}).",
+            ephemeral=True,
+        )
+
+
 class Eventos(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -30,7 +102,6 @@ class Eventos(commands.Cog):
     @evento_group.command(name="crear", description="Crea un nuevo evento con inscripciones abiertas")
     @app_commands.describe(
         titulo="Título del evento (ej: Mítico+ semanal)",
-        descripcion="Descripción / detalles del evento",
         tipo_inscripcion="Individual (solo nombre de personaje) o Grupal (equipos completos ya formados)",
         fecha="Fecha del evento en formato DD/MM/AAAA (ej: 30/06/2026)",
         hora="Hora del evento en formato 24h HH:MM (ej: 23:00)",
@@ -48,7 +119,6 @@ class Eventos(commands.Cog):
         self,
         interaction: discord.Interaction,
         titulo: str,
-        descripcion: str,
         tipo_inscripcion: app_commands.Choice[str],
         fecha: str,
         hora: str,
@@ -79,36 +149,18 @@ class Eventos(commands.Cog):
             )
             return
 
-        evento_id = storage.crear_evento(
+        modal = DescripcionEventoModal(
             titulo=titulo,
-            descripcion=descripcion,
-            guild_id=interaction.guild_id,
-            canal_id=canal_publicacion.id,
-            num_equipos=num_equipos if tipo_inscripcion.value == "individual" else None,
-            creado_por=interaction.user.id,
-            fecha_hora_ts=fecha_hora_ts,
             tipo_inscripcion=tipo_inscripcion.value,
-            canal_inscripciones_id=canal_inscripciones.id if canal_inscripciones else None,
+            fecha_hora_ts=fecha_hora_ts,
+            canal_publicacion=canal_publicacion,
+            num_equipos=num_equipos if tipo_inscripcion.value == "individual" else None,
             imagen_url=imagen.url if imagen else None,
+            canal_inscripciones_id=canal_inscripciones.id if canal_inscripciones else None,
+            guild_id=interaction.guild_id,
+            creado_por=interaction.user.id,
         )
-        evento = storage.obtener_evento(evento_id)
-        embed = construir_embed_evento(evento)
-        view = EventoView(evento_id, abierto=True)
-
-        try:
-            mensaje = await canal_publicacion.send(embed=embed, view=view)
-        except discord.Forbidden:
-            storage.actualizar_evento(evento_id, estado="finalizado")
-            await interaction.response.send_message(
-                f"❌ No tengo permiso para publicar en {canal_publicacion.mention}.", ephemeral=True
-            )
-            return
-
-        storage.actualizar_evento(evento_id, mensaje_id=mensaje.id)
-        await interaction.response.send_message(
-            f"✅ Evento **{titulo}** publicado en {canal_publicacion.mention} (ID: {evento_id}).",
-            ephemeral=True,
-        )
+        await interaction.response.send_modal(modal)
 
     # ---------------------- CERRAR ----------------------
     @evento_group.command(name="cerrar", description="Cierra las inscripciones de un evento")

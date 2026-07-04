@@ -177,7 +177,7 @@ class NombreEquipoModal(discord.ui.Modal, title="Inscribir equipo (1/2)"):
 
     nombre_equipo = discord.ui.TextInput(
         label="Nombre del equipo",
-        placeholder="Ej: Ej: Murlocs Anónimos",
+        placeholder="Ej: Murlocs Anónimos",
         max_length=50,
         required=True,
     )
