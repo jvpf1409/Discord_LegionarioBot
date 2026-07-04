@@ -130,10 +130,36 @@ demás campos se abre un formulario (modal) con un campo de texto tipo párrafo 
 
 ## 7. Persistencia y reinicios
 
-Toda la información se guarda en `data/eventos.json`. Al reiniciar el bot, `main.py`
-vuelve a registrar automáticamente los botones de los eventos que sigan abiertos o
-cerrados (pero no finalizados), por lo que los botones **no se rompen** tras un reinicio
-o caída del bot.
+Al reiniciar el bot, `main.py` vuelve a registrar automáticamente los botones de los
+eventos que sigan abiertos o cerrados (pero no finalizados), por lo que los botones
+**no se rompen** tras un reinicio o caída del bot — siempre que los datos del evento
+sigan existiendo (ver siguiente sección).
+
+### Dónde se guardan los datos
+
+- **Sin `DATABASE_URL` configurada** (por ejemplo, corriendo el bot en tu máquina): los
+  eventos se guardan en `data/eventos.json`. Cómodo para probar, pero **no sirve para
+  producción en Render**: su filesystem no es persistente, así que ese archivo se resetea
+  a lo que esté commiteado en git cada vez que se hace un deploy nuevo, perdiendo
+  cualquier evento creado después del último commit.
+- **Con `DATABASE_URL` configurada**: los eventos se guardan en esa base de datos Postgres
+  en vez del archivo JSON, y sobreviven a cualquier deploy. **Es obligatorio configurarla
+  en Render** para no perder datos reales de tu hermandad.
+
+Cómo configurarla (gratis):
+1. Crea una cuenta en [Supabase](https://supabase.com) o [Neon](https://neon.tech) (ambos
+   tienen un plan Postgres gratis permanente) y crea un proyecto/base de datos nueva.
+2. Copia el connection string (algo como
+   `postgresql://usuario:password@host:5432/basededatos`).
+3. En Render: ve a tu servicio → **Environment** → agrega la variable `DATABASE_URL` con
+   ese valor, y vuelve a desplegar.
+4. En tu máquina, **no** definas `DATABASE_URL` en tu `.env` local (déjala vacía) para
+   seguir probando con el archivo JSON — así tu entorno de pruebas nunca toca los datos
+   reales de producción.
+
+El bot detecta automáticamente cuál usar: si `DATABASE_URL` existe, usa Postgres
+(`utils/storage_pg.py`); si no, usa el archivo JSON (`utils/storage_json.py`). Ambos
+implementan las mismas funciones, así que el resto del código no distingue cuál está activo.
 
 ## 8. Personalización rápida
 
@@ -145,9 +171,10 @@ o caída del bot.
 - **Cambiar el máximo de equipos:** modifica el `app_commands.Range[int, 1, 20]`
   en los comandos correspondientes.
 
-## 9. Migrar a una base de datos real (opcional)
+## 9. Base de datos (ya integrado)
 
-Si tu hermandad crece mucho, `utils/storage.py` está aislado a propósito: puedes
-reemplazar sus funciones internas por llamadas a SQLite/PostgreSQL sin tocar el resto
-del bot, ya que los cogs solo dependen de las funciones públicas (`crear_evento`,
-`obtener_evento`, `agregar_participante`, etc.).
+Ver sección 7: `utils/storage.py` elige automáticamente entre Postgres
+(`utils/storage_pg.py`, producción) y JSON local (`utils/storage_json.py`, pruebas)
+según exista o no `DATABASE_URL`. Los cogs solo dependen de las funciones públicas
+(`crear_evento`, `obtener_evento`, `agregar_participante`, etc.), así que si más adelante
+quieres cambiar de proveedor de base de datos, solo se toca `utils/storage_pg.py`.
