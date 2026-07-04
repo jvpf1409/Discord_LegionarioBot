@@ -1,0 +1,71 @@
+{
+  "next_id": 5,
+  "eventos": {
+    "1": {
+      "id": "1",
+      "titulo": "Evento de prueba",
+      "descripcion": "Este es un evento de prueba",
+      "guild_id": 721596332803883009,
+      "canal_id": 879921569240080384,
+      "canal_inscripciones_id": null,
+      "mensaje_id": 1522787562333405187,
+      "tipo_inscripcion": "individual",
+      "num_equipos": 2,
+      "estado": "abierto",
+      "creado_por": 442858646913679360,
+      "participantes": [],
+      "equipos": [],
+      "ganador": null
+    },
+    "2": {
+      "id": "2",
+      "titulo": "Prueba",
+      "descripcion": "Evento de prueba",
+      "guild_id": 721596332803883009,
+      "canal_id": 721596333227638794,
+      "canal_inscripciones_id": null,
+      "mensaje_id": null,
+      "tipo_inscripcion": "grupal",
+      "num_equipos": 2,
+      "estado": "finalizado",
+      "creado_por": 442858646913679360,
+      "participantes": [],
+      "equipos": [],
+      "ganador": null
+    },
+    "3": {
+      "id": "3",
+      "titulo": "Prueba",
+      "descripcion": "Este es un evento de prueba",
+      "guild_id": 721596332803883009,
+      "canal_id": 966102411859066880,
+      "canal_inscripciones_id": 966102411859066880,
+      "mensaje_id": 1522805476494934308,
+      "tipo_inscripcion": "grupal",
+      "num_equipos": null,
+      "estado": "abierto",
+      "creado_por": 442858646913679360,
+      "participantes": [],
+      "equipos": [],
+      "ganador": null
+    },
+    "4": {
+      "id": "4",
+      "titulo": "Prueba",
+      "descripcion": "Evento de prueba",
+      "guild_id": 721596332803883009,
+      "canal_id": 966102411859066880,
+      "canal_inscripciones_id": null,
+      "mensaje_id": 1522818197215248438,
+      "tipo_inscripcion": "grupal",
+      "num_equipos": null,
+      "fecha_hora_ts": 1783738800,
+      "imagen_url": "https://cdn.discordapp.com/ephemeral-attachments/1522805145572741303/1522818192614100992/image.png?ex=6a49da75&is=6a4888f5&hm=b589f7004e24b5048a9b0219cd58849db32fd63bdc88cf27e831fbcb0ae6508b&",
+      "estado": "abierto",
+      "creado_por": 442858646913679360,
+      "participantes": [],
+      "equipos": [],
+      "ganador": null
+    }
+  }
+}
