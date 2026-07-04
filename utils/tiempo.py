@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-ZONA_HORARIA = os.getenv("ZONA_HORARIA", "America/Mexico_City")  # CST fijo (UTC-6), sin horario de verano
+ZONA_HORARIA = os.getenv("ZONA_HORARIA", "America/Santiago")  # Hora de Chile
 
 
 def parse_fecha_hora(fecha: str, hora: str) -> int:
