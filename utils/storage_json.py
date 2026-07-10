@@ -97,6 +97,17 @@ def actualizar_evento(evento_id: str, **cambios):
     return data["eventos"][evento_id]
 
 
+def eliminar_evento(evento_id: str) -> bool:
+    """Borra el evento por completo (irreversible). Devuelve True si existía."""
+    data = cargar_datos()
+    evento_id = str(evento_id)
+    if evento_id not in data["eventos"]:
+        return False
+    del data["eventos"][evento_id]
+    guardar_datos(data)
+    return True
+
+
 def agregar_participante(evento_id: str, participante: dict) -> tuple[bool, str]:
     """Devuelve (ok, mensaje). Evita inscripciones duplicadas del mismo usuario."""
     data = cargar_datos()

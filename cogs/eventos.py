@@ -95,6 +95,63 @@ class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
         )
 
 
+class ConfirmarEliminarView(discord.ui.View):
+    """Confirmación antes de borrar un evento de forma permanente."""
+
+    def __init__(self, evento_id: str, titulo: str, autor_id: int):
+        super().__init__(timeout=60)
+        self.evento_id = evento_id
+        self.titulo = titulo
+        self.autor_id = autor_id
+        self.message: discord.Message | None = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.autor_id:
+            await interaction.response.send_message(
+                "❌ Solo quien ejecutó el comando puede confirmar esto.", ephemeral=True
+            )
+            return False
+        return True
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        if self.message is not None:
+            try:
+                await self.message.edit(content="⌛ Se acabó el tiempo, el evento no fue eliminado.", view=self)
+            except discord.HTTPException:
+                pass
+
+    @discord.ui.button(label="Sí, eliminar permanentemente", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def confirmar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        evento = storage.obtener_evento(self.evento_id)
+        if evento is not None:
+            try:
+                canal = interaction.client.get_channel(evento["canal_id"])
+                mensaje = await canal.fetch_message(evento["mensaje_id"])
+                await mensaje.delete()
+            except Exception:
+                pass
+            storage.eliminar_evento(self.evento_id)
+
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(
+            content=f"🗑️ Evento **{self.titulo}** (ID: {self.evento_id}) eliminado permanentemente.",
+            view=self,
+        )
+        self.stop()
+
+    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary, emoji="✖️")
+    async def rechazar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(
+            content="Operación cancelada — el evento **no** fue eliminado.", view=self
+        )
+        self.stop()
+
+
 class Eventos(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -286,11 +343,32 @@ class Eventos(commands.Cog):
             pass
         await interaction.response.send_message(f"🗑️ Evento **{evento['titulo']}** cancelado.")
 
+    # ---------------------- ELIMINAR ----------------------
+    @evento_group.command(name="eliminar", description="Elimina un evento de forma PERMANENTE (borra el mensaje y los datos)")
+    @app_commands.describe(evento_id="ID del evento a eliminar")
+    @es_organizador()
+    async def eliminar(self, interaction: discord.Interaction, evento_id: str):
+        evento = storage.obtener_evento(evento_id)
+        if evento is None:
+            await interaction.response.send_message("❌ No existe ese evento.", ephemeral=True)
+            return
+
+        view = ConfirmarEliminarView(evento_id, evento["titulo"], interaction.user.id)
+        await interaction.response.send_message(
+            f"⚠️ **¿Seguro que quieres eliminar el evento #{evento_id} — {evento['titulo']}?**\n"
+            "Esta acción es **permanente**: borra el mensaje del evento y todos sus datos "
+            "(inscritos, equipos, etc.) de la base de datos. No se puede deshacer.",
+            view=view,
+            ephemeral=True,
+        )
+        view.message = await interaction.original_response()
+
     # Manejo de errores de permisos para todo el grupo
     @crear.error
     @cerrar.error
     @registrar_ganador.error
     @cancelar.error
+    @eliminar.error
     async def on_permission_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingRole):
             mensaje = f"🚫 Necesitas el rol **{ROL_OFICIAL}** para usar este comando."

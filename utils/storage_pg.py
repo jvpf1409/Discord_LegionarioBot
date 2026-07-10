@@ -127,6 +127,13 @@ def actualizar_evento(evento_id: str, **cambios):
     return obtener_evento(evento_id)
 
 
+def eliminar_evento(evento_id: str) -> bool:
+    """Borra el evento por completo (irreversible). Devuelve True si existía."""
+    with _conectar() as conn:
+        cursor = conn.execute("DELETE FROM eventos WHERE id = %s", (int(evento_id),))
+    return cursor.rowcount > 0
+
+
 def agregar_participante(evento_id: str, participante: dict) -> tuple[bool, str]:
     """Devuelve (ok, mensaje). Evita inscripciones duplicadas del mismo usuario."""
     with _conectar() as conn:
