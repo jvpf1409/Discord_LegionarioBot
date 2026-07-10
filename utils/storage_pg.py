@@ -39,6 +39,15 @@ def _asegurar_tabla():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS raids (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                data JSONB NOT NULL
+            )
+            """
+        )
 
 
 _asegurar_tabla()
@@ -197,3 +206,111 @@ def quitar_equipo(evento_id: str, user_id: int) -> bool:
             data["equipos"] = [e for e in data["equipos"] if e["user_id"] != user_id]
             conn.execute("UPDATE eventos SET data = %s WHERE id = %s", (Json(data), int(evento_id)))
     return len(data["equipos"]) < antes
+
+
+def _fila_a_raid(fila) -> dict:
+    raid = dict(fila["data"])
+    raid["id"] = str(fila["id"])
+    return raid
+
+
+def crear_raid(
+    titulo: str,
+    descripcion: str,
+    guild_id: int,
+    canal_id: int,
+    fecha_hora_ts: int,
+    creado_por: int,
+    canal_inscripciones_id: int | None = None,
+    imagen_url: str | None = None,
+) -> str:
+    data = {
+        "titulo": titulo,
+        "descripcion": descripcion,
+        "guild_id": guild_id,
+        "canal_id": canal_id,
+        "canal_inscripciones_id": canal_inscripciones_id,
+        "mensaje_id": None,
+        "fecha_hora_ts": fecha_hora_ts,
+        "imagen_url": imagen_url,
+        "estado": "abierto",  # abierto | cerrado | cancelado
+        "creado_por": creado_por,
+        "inscritos": [],  # {user_id, nombre_discord, clase, especializacion, rol}
+    }
+    with _conectar() as conn:
+        fila = conn.execute(
+            "INSERT INTO raids (guild_id, data) VALUES (%s, %s) RETURNING id",
+            (guild_id, Json(data)),
+        ).fetchone()
+    return str(fila["id"])
+
+
+def obtener_raid(raid_id: str) -> dict | None:
+    with _conectar() as conn:
+        fila = conn.execute("SELECT id, data FROM raids WHERE id = %s", (int(raid_id),)).fetchone()
+    return _fila_a_raid(fila) if fila else None
+
+
+def listar_raids(guild_id: int, estado: str | None = None) -> list[dict]:
+    with _conectar() as conn:
+        filas = conn.execute(
+            "SELECT id, data FROM raids WHERE guild_id = %s ORDER BY id", (guild_id,)
+        ).fetchall()
+    raids = [_fila_a_raid(f) for f in filas]
+    if estado:
+        raids = [r for r in raids if r["estado"] == estado]
+    return raids
+
+
+def listar_todas_las_raids() -> list[dict]:
+    """Todas las raids de todos los servidores (para re-registrar vistas al iniciar)."""
+    with _conectar() as conn:
+        filas = conn.execute("SELECT id, data FROM raids ORDER BY id").fetchall()
+    return [_fila_a_raid(f) for f in filas]
+
+
+def actualizar_raid(raid_id: str, **cambios):
+    with _conectar() as conn:
+        with conn.transaction():
+            fila = conn.execute(
+                "SELECT data FROM raids WHERE id = %s FOR UPDATE", (int(raid_id),)
+            ).fetchone()
+            if fila is None:
+                return None
+            data = dict(fila["data"])
+            data.update(cambios)
+            conn.execute("UPDATE raids SET data = %s WHERE id = %s", (Json(data), int(raid_id)))
+    return obtener_raid(raid_id)
+
+
+def inscribir_en_raid(raid_id: str, inscrito: dict) -> tuple[bool, str]:
+    """Registra la inscripción; si el usuario ya estaba inscrito, actualiza su clase/spec."""
+    with _conectar() as conn:
+        with conn.transaction():
+            fila = conn.execute(
+                "SELECT data FROM raids WHERE id = %s FOR UPDATE", (int(raid_id),)
+            ).fetchone()
+            if fila is None:
+                return False, "La raid no existe."
+            data = dict(fila["data"])
+            if data["estado"] != "abierto":
+                return False, "Las inscripciones para esta raid están cerradas."
+            data["inscritos"] = [i for i in data["inscritos"] if i["user_id"] != inscrito["user_id"]]
+            data["inscritos"].append(inscrito)
+            conn.execute("UPDATE raids SET data = %s WHERE id = %s", (Json(data), int(raid_id)))
+    return True, "Inscripción registrada correctamente."
+
+
+def quitar_de_raid(raid_id: str, user_id: int) -> bool:
+    with _conectar() as conn:
+        with conn.transaction():
+            fila = conn.execute(
+                "SELECT data FROM raids WHERE id = %s FOR UPDATE", (int(raid_id),)
+            ).fetchone()
+            if fila is None:
+                return False
+            data = dict(fila["data"])
+            antes = len(data["inscritos"])
+            data["inscritos"] = [i for i in data["inscritos"] if i["user_id"] != user_id]
+            conn.execute("UPDATE raids SET data = %s WHERE id = %s", (Json(data), int(raid_id)))
+    return len(data["inscritos"]) < antes

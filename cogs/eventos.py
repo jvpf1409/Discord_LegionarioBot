@@ -9,13 +9,9 @@ from discord.ext import commands
 
 from utils import storage
 from utils.equipos import generar_equipos
+from utils.permisos import es_organizador
 from utils.tiempo import parse_fecha_hora
 from cogs.vistas import EventoView, construir_embed_evento
-
-
-def es_organizador():
-    """Requiere permiso de 'Gestionar servidor' (ajústalo a tu rol de oficial/raid leader)."""
-    return app_commands.checks.has_permissions(manage_guild=True)
 
 
 class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):

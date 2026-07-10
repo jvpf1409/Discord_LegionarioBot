@@ -18,6 +18,13 @@ if os.getenv("DATABASE_URL"):
         quitar_participante,
         agregar_equipo,
         quitar_equipo,
+        crear_raid,
+        obtener_raid,
+        listar_raids,
+        listar_todas_las_raids,
+        actualizar_raid,
+        inscribir_en_raid,
+        quitar_de_raid,
     )
 else:
     from utils.storage_json import (
@@ -30,4 +37,11 @@ else:
         quitar_participante,
         agregar_equipo,
         quitar_equipo,
+        crear_raid,
+        obtener_raid,
+        listar_raids,
+        listar_todas_las_raids,
+        actualizar_raid,
+        inscribir_en_raid,
+        quitar_de_raid,
     )

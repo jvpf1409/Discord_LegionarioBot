@@ -15,14 +15,20 @@ def _asegurar_archivo():
     os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
     if not os.path.exists(DATA_PATH):
         with open(DATA_PATH, "w", encoding="utf-8") as f:
-            json.dump({"next_id": 1, "eventos": {}}, f, ensure_ascii=False, indent=2)
+            json.dump(
+                {"next_id": 1, "eventos": {}, "next_raid_id": 1, "raids": {}},
+                f, ensure_ascii=False, indent=2,
+            )
 
 
 def cargar_datos() -> dict:
     _asegurar_archivo()
     with _lock:
         with open(DATA_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+    data.setdefault("raids", {})
+    data.setdefault("next_raid_id", 1)
+    return data
 
 
 def guardar_datos(data: dict):
@@ -155,3 +161,90 @@ def quitar_equipo(evento_id: str, user_id: int) -> bool:
     evento["equipos"] = [e for e in evento["equipos"] if e["user_id"] != user_id]
     guardar_datos(data)
     return len(evento["equipos"]) < antes
+
+
+def crear_raid(
+    titulo: str,
+    descripcion: str,
+    guild_id: int,
+    canal_id: int,
+    fecha_hora_ts: int,
+    creado_por: int,
+    canal_inscripciones_id: int | None = None,
+    imagen_url: str | None = None,
+) -> str:
+    data = cargar_datos()
+    raid_id = str(data["next_raid_id"])
+    data["next_raid_id"] += 1
+    data["raids"][raid_id] = {
+        "id": raid_id,
+        "titulo": titulo,
+        "descripcion": descripcion,
+        "guild_id": guild_id,
+        "canal_id": canal_id,
+        "canal_inscripciones_id": canal_inscripciones_id,
+        "mensaje_id": None,
+        "fecha_hora_ts": fecha_hora_ts,
+        "imagen_url": imagen_url,
+        "estado": "abierto",  # abierto | cerrado | cancelado
+        "creado_por": creado_por,
+        "inscritos": [],  # {user_id, nombre_discord, clase, especializacion, rol}
+    }
+    guardar_datos(data)
+    return raid_id
+
+
+def obtener_raid(raid_id: str) -> dict | None:
+    data = cargar_datos()
+    return data["raids"].get(str(raid_id))
+
+
+def listar_raids(guild_id: int, estado: str | None = None) -> list[dict]:
+    data = cargar_datos()
+    raids = [r for r in data["raids"].values() if r["guild_id"] == guild_id]
+    if estado:
+        raids = [r for r in raids if r["estado"] == estado]
+    return sorted(raids, key=lambda r: int(r["id"]))
+
+
+def listar_todas_las_raids() -> list[dict]:
+    """Todas las raids de todos los servidores (para re-registrar vistas al iniciar)."""
+    data = cargar_datos()
+    return sorted(data["raids"].values(), key=lambda r: int(r["id"]))
+
+
+def actualizar_raid(raid_id: str, **cambios):
+    data = cargar_datos()
+    raid_id = str(raid_id)
+    if raid_id not in data["raids"]:
+        return None
+    data["raids"][raid_id].update(cambios)
+    guardar_datos(data)
+    return data["raids"][raid_id]
+
+
+def inscribir_en_raid(raid_id: str, inscrito: dict) -> tuple[bool, str]:
+    """Registra la inscripción; si el usuario ya estaba inscrito, actualiza su clase/spec."""
+    data = cargar_datos()
+    raid_id = str(raid_id)
+    raid = data["raids"].get(raid_id)
+    if raid is None:
+        return False, "La raid no existe."
+    if raid["estado"] != "abierto":
+        return False, "Las inscripciones para esta raid están cerradas."
+    raid["inscritos"] = [i for i in raid["inscritos"] if i["user_id"] != inscrito["user_id"]]
+    raid["inscritos"].append(inscrito)
+    guardar_datos(data)
+    return True, "Inscripción registrada correctamente."
+
+
+def quitar_de_raid(raid_id: str, user_id: int) -> bool:
+    data = cargar_datos()
+    raid_id = str(raid_id)
+    raid = data["raids"].get(raid_id)
+    if raid is None:
+        return False
+    antes = len(raid["inscritos"])
+    raid["inscritos"] = [i for i in raid["inscritos"] if i["user_id"] != user_id]
+    guardar_datos(data)
+    return len(raid["inscritos"]) < antes

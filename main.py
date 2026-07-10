@@ -13,7 +13,9 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 from utils import storage
+from utils.iconos import cargar_iconos
 from cogs.vistas import EventoView
+from cogs.vistas_raid import RaidView
 
 load_dotenv()
 
@@ -30,12 +32,21 @@ bot = commands.Bot(command_prefix="!wow ", intents=intents)
 
 @bot.event
 async def on_ready():
+    # Sube (una sola vez) los íconos personalizados de assets/icons/ como
+    # application emojis, y deja el resto del bot listo para usarlos.
+    await cargar_iconos(bot)
+
     # Volver a registrar las vistas de todos los eventos no finalizados,
     # para que los botones sigan funcionando tras reiniciar el bot.
     for evento in storage.listar_todos_los_eventos():
         if evento["estado"] in ("abierto", "cerrado") and evento.get("mensaje_id"):
             abierto = evento["estado"] == "abierto"
             bot.add_view(EventoView(evento["id"], abierto=abierto), message_id=evento["mensaje_id"])
+
+    for raid in storage.listar_todas_las_raids():
+        if raid["estado"] in ("abierto", "cerrado") and raid.get("mensaje_id"):
+            abierta = raid["estado"] == "abierto"
+            bot.add_view(RaidView(raid["id"], abierta=abierta), message_id=raid["mensaje_id"])
 
     if GUILD_ID:
         guild = discord.Object(id=int(GUILD_ID))
@@ -50,6 +61,7 @@ async def on_ready():
 async def main():
     async with bot:
         await bot.load_extension("cogs.eventos")
+        await bot.load_extension("cogs.raids")
         await bot.start(TOKEN)
 
 
