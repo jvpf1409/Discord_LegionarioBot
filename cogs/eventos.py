@@ -3,6 +3,8 @@ Cog con los comandos de administración de eventos:
 crear, cerrar, generar equipos, registrar ganador, listar, cancelar.
 """
 
+import logging
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -12,10 +14,14 @@ from utils.equipos import generar_equipos
 from utils.tiempo import parse_fecha_hora
 from cogs.vistas import EventoView, construir_embed_evento
 
+logger = logging.getLogger(__name__)
+
+ROL_OFICIAL = "Legionario Oficial"
+
 
 def es_organizador():
-    """Requiere permiso de 'Gestionar servidor' (ajústalo a tu rol de oficial/raid leader)."""
-    return app_commands.checks.has_permissions(manage_guild=True)
+    """Requiere el rol de oficial de la hermandad (ajustable arriba en ROL_OFICIAL)."""
+    return app_commands.checks.has_role(ROL_OFICIAL)
 
 
 class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
@@ -339,13 +345,24 @@ class Eventos(commands.Cog):
     @registrar_ganador.error
     @cancelar.error
     async def on_permission_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.MissingPermissions):
-            await interaction.response.send_message(
-                "🚫 Necesitas permiso de **Gestionar servidor** (o el rol de oficial configurado) para usar este comando.",
-                ephemeral=True,
-            )
+        if isinstance(error, app_commands.MissingRole):
+            mensaje = f"🚫 Necesitas el rol **{ROL_OFICIAL}** para usar este comando."
         else:
-            await interaction.response.send_message(f"⚠️ Ocurrió un error: {error}", ephemeral=True)
+            # CommandInvokeError envuelve la excepción real en .original; la mostramos
+            # y la registramos completa para poder diagnosticarla en los logs de Render.
+            original = getattr(error, "original", error)
+            logger.exception("Error inesperado en un comando de /evento", exc_info=original)
+            mensaje = f"⚠️ Ocurrió un error: {original}"
+
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(mensaje, ephemeral=True)
+            else:
+                await interaction.response.send_message(mensaje, ephemeral=True)
+        except discord.HTTPException:
+            # La interacción ya expiró o fue respondida por otra vía: no hay forma
+            # de avisar al usuario, pero no debe tumbar el bot.
+            logger.warning("No se pudo notificar el error al usuario (interacción ya cerrada).")
 
 
 async def setup(bot: commands.Bot):
