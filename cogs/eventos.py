@@ -1,6 +1,6 @@
 """
 Cog con los comandos de administración de eventos:
-crear, cerrar, generar equipos, registrar ganador, listar, cancelar.
+crear, cerrar, registrar ganador, listar, cancelar.
 """
 
 import logging
@@ -10,7 +10,6 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import storage
-from utils.equipos import generar_equipos
 from utils.tiempo import parse_fecha_hora
 from cogs.vistas import EventoView, construir_embed_evento
 
@@ -108,11 +107,11 @@ class Eventos(commands.Cog):
     @evento_group.command(name="crear", description="Crea un nuevo evento con inscripciones abiertas")
     @app_commands.describe(
         titulo="Título del evento (ej: Mítico+ semanal)",
-        tipo_inscripcion="Individual (solo nombre de personaje) o Grupal (equipos completos ya formados)",
+        tipo_inscripcion="Individual (lista simple de inscritos, sin equipos) o Grupal (equipos completos ya formados)",
         fecha="Fecha del evento en formato DD/MM/AAAA (ej: 30/06/2026)",
         hora="Hora del evento en formato 24h HH:MM (ej: 23:00)",
         canal_publicacion="Canal donde se publicará el evento (embed + botones)",
-        num_equipos="Solo para Individual: en cuántos equipos se repartirán los inscritos al cerrar",
+        num_equipos="Solo para Grupal: cupo máximo de equipos (vacío = sin límite)",
         imagen="Imagen opcional para el evento (banner, logo del jefe, etc.)",
         canal_inscripciones="Canal opcional donde se irá anunciando cada inscripción en vivo",
     )
@@ -133,13 +132,6 @@ class Eventos(commands.Cog):
         imagen: discord.Attachment = None,
         canal_inscripciones: discord.TextChannel = None,
     ):
-        if tipo_inscripcion.value == "individual" and num_equipos is None:
-            await interaction.response.send_message(
-                "❌ Los eventos individuales necesitan `num_equipos` (en cuántos equipos se repartirán al cerrar).",
-                ephemeral=True,
-            )
-            return
-
         try:
             fecha_hora_ts = parse_fecha_hora(fecha, hora)
         except ValueError:
@@ -160,7 +152,7 @@ class Eventos(commands.Cog):
             tipo_inscripcion=tipo_inscripcion.value,
             fecha_hora_ts=fecha_hora_ts,
             canal_publicacion=canal_publicacion,
-            num_equipos=num_equipos if tipo_inscripcion.value == "individual" else None,
+            num_equipos=num_equipos if tipo_inscripcion.value == "grupal" else None,
             imagen_url=imagen.url if imagen else None,
             canal_inscripciones_id=canal_inscripciones.id if canal_inscripciones else None,
             guild_id=interaction.guild_id,
@@ -201,69 +193,30 @@ class Eventos(commands.Cog):
             f"🔒 Inscripciones cerradas para **{evento['titulo']}** ({resumen}).",
         )
 
-    # ---------------------- GENERAR EQUIPOS ----------------------
-    @evento_group.command(name="generar_equipos", description="Genera y publica los equipos de forma balanceada")
-    @app_commands.describe(evento_id="ID del evento", num_equipos="Sobrescribe el número de equipos (opcional)")
-    @es_organizador()
-    async def generar_equipos_cmd(self, interaction: discord.Interaction, evento_id: str, num_equipos: app_commands.Range[int, 1, 20] = None):
-        evento = storage.obtener_evento(evento_id)
-        if evento is None:
-            await interaction.response.send_message("❌ No existe ese evento.", ephemeral=True)
-            return
-        if evento["tipo_inscripcion"] == "grupal":
-            await interaction.response.send_message(
-                "⚠️ Este evento es de tipo **grupal**: los equipos ya quedaron fijos desde la inscripción. "
-                "Revisa el embed del evento para verlos.",
-                ephemeral=True,
-            )
-            return
-        if not evento["participantes"]:
-            await interaction.response.send_message("⚠️ No hay participantes inscritos todavía.", ephemeral=True)
-            return
-
-        n = num_equipos or evento["num_equipos"]
-        equipos = generar_equipos(evento["participantes"], n)
-        storage.actualizar_evento(evento_id, equipos=equipos, num_equipos=n)
-
-        embed = discord.Embed(
-            title=f"👥 Equipos — {evento['titulo']}",
-            color=discord.Color.blurple(),
-            description=f"Se generaron **{n}** equipos a partir de {len(evento['participantes'])} inscritos.",
-        )
-        for i, equipo in enumerate(equipos, start=1):
-            if equipo:
-                lineas = "\n".join(
-                    f"• **{p['personaje']}** — <@{p['user_id']}>"
-                    for p in equipo
-                )
-            else:
-                lineas = "_(sin integrantes)_"
-            embed.add_field(name=f"Equipo {i}", value=lineas, inline=False)
-
-        embed.set_footer(text=f"ID del evento: {evento_id}")
-        await interaction.response.send_message(embed=embed)
-
     # ---------------------- REGISTRAR GANADOR ----------------------
-    @evento_group.command(name="registrar_ganador", description="Marca el equipo ganador y finaliza el evento")
-    @app_commands.describe(evento_id="ID del evento", numero_equipo="Número del equipo ganador (según el listado generado)")
+    @evento_group.command(name="registrar_ganador", description="Marca el equipo ganador y finaliza el evento (solo eventos grupales)")
+    @app_commands.describe(evento_id="ID del evento", numero_equipo="Número del equipo ganador (según el orden de inscripción)")
     @es_organizador()
     async def registrar_ganador(self, interaction: discord.Interaction, evento_id: str, numero_equipo: app_commands.Range[int, 1, 20]):
         evento = storage.obtener_evento(evento_id)
         if evento is None:
             await interaction.response.send_message("❌ No existe ese evento.", ephemeral=True)
             return
+        if evento["tipo_inscripcion"] != "grupal":
+            await interaction.response.send_message(
+                "⚠️ Este evento es individual: no tiene equipos ni ganador, es solo una lista de inscritos.",
+                ephemeral=True,
+            )
+            return
         if not evento["equipos"]:
-            await interaction.response.send_message("⚠️ Primero debes generar los equipos con /evento generar_equipos.", ephemeral=True)
+            await interaction.response.send_message("⚠️ Todavía no se ha inscrito ningún equipo.", ephemeral=True)
             return
         if numero_equipo < 1 or numero_equipo > len(evento["equipos"]):
             await interaction.response.send_message(f"❌ Ese equipo no existe. Hay {len(evento['equipos'])} equipos.", ephemeral=True)
             return
 
         equipo_ganador = evento["equipos"][numero_equipo - 1]
-        if evento["tipo_inscripcion"] == "grupal":
-            nombre_ganador = equipo_ganador["nombre_equipo"]
-        else:
-            nombre_ganador = f"Equipo {numero_equipo}"
+        nombre_ganador = equipo_ganador["nombre_equipo"]
         storage.actualizar_evento(evento_id, estado="finalizado", ganador=nombre_ganador)
 
         evento = storage.obtener_evento(evento_id)
@@ -274,14 +227,9 @@ class Eventos(commands.Cog):
         except Exception:
             pass
 
-        if evento["tipo_inscripcion"] == "grupal":
-            integrantes = "\n".join(
-                f"• **{i['rol']}** — {i['personaje']}" for i in equipo_ganador["integrantes"]
-            ) or "_(sin integrantes)_"
-        else:
-            integrantes = "\n".join(
-                f"• **{p['personaje']}** — <@{p['user_id']}>" for p in equipo_ganador
-            ) or "_(sin integrantes)_"
+        integrantes = "\n".join(
+            f"• **{i['rol']}** — {i['personaje']}" for i in equipo_ganador["integrantes"]
+        ) or "_(sin integrantes)_"
         embed = discord.Embed(
             title=f"🏆 ¡Tenemos ganador! — {evento['titulo']}",
             description=f"**{nombre_ganador}** se lleva la victoria 🎉",
@@ -309,7 +257,7 @@ class Eventos(commands.Cog):
             if e["tipo_inscripcion"] == "grupal":
                 resumen = f"Equipos: {len(e['equipos'])}/{e['num_equipos']}" if e["num_equipos"] else f"Equipos: {len(e['equipos'])}"
             else:
-                resumen = f"Inscritos: {len(e['participantes'])} | Equipos previstos: {e['num_equipos']}"
+                resumen = f"Inscritos: {len(e['participantes'])}"
             tipo_emoji = "👥" if e["tipo_inscripcion"] == "grupal" else "🙋"
             if e.get("fecha_hora_ts"):
                 resumen += f"\n📅 <t:{e['fecha_hora_ts']}:f>"
@@ -341,7 +289,6 @@ class Eventos(commands.Cog):
     # Manejo de errores de permisos para todo el grupo
     @crear.error
     @cerrar.error
-    @generar_equipos_cmd.error
     @registrar_ganador.error
     @cancelar.error
     async def on_permission_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):

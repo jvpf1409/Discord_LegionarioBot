@@ -75,30 +75,27 @@ Si todo va bien verás algo como:
 ## 6. Comandos disponibles
 
 Todos son comandos slash bajo el grupo `/evento`. Los que crean o modifican eventos
-requieren el permiso **Gestionar servidor** (puedes cambiar esto en `cogs/eventos.py`,
-función `es_organizador()`, por ejemplo para exigir un rol específico como "Oficial").
+requieren el rol **Legionario Oficial** (puedes cambiar esto en `cogs/eventos.py`,
+constante `ROL_OFICIAL`).
 
 | Comando | Descripción |
 |---|---|
 | `/evento crear titulo tipo_inscripcion fecha hora canal_publicacion [num_equipos] [imagen] [canal_inscripciones]` | Abre un formulario para la descripción y publica el evento con embed + botones |
 | `/evento cerrar evento_id` | Cierra inscripciones, deshabilita el botón |
-| `/evento generar_equipos evento_id [num_equipos]` | Solo para eventos **individuales**: genera y publica los equipos balanceados |
-| `/evento registrar_ganador evento_id numero_equipo` | Marca el equipo ganador y finaliza el evento |
+| `/evento registrar_ganador evento_id numero_equipo` | Solo eventos **grupales**: marca el equipo ganador y finaliza el evento |
 | `/evento listar [estado]` | Lista eventos del servidor (abiertos/cerrados/finalizados) |
 | `/evento cancelar evento_id` | Cancela el evento por completo |
 
 ### Tipos de inscripción
 
-- **Individual**: cada persona se inscribe con un formulario de un solo campo (nombre de
-  personaje). Al cerrar inscripciones, el oficial usa `/evento generar_equipos` para
-  repartir a los inscritos de forma balanceada entre `num_equipos` equipos.
+- **Individual**: es solo una lista de asistencia, para eventos que no necesitan equipos.
+  Al pulsar **Inscribirse** quedas anotado de inmediato con tu nombre de Discord — no hay
+  ningún formulario ni se pide `num_equipos`.
 - **Grupal**: cada inscripción registra un equipo completo ya formado. El formulario
   aparece en dos pasos: primero el nombre del equipo; al enviarlo aparece un botón
   **➡️ Continuar** (Discord no permite abrir un modal directamente desde otro modal),
-  que abre el segundo formulario con los 5 roles (Tank, Healer, DPS x3). No se pide
-  `num_equipos` al crear el evento: se pueden inscribir equipos sin límite hasta que se
-  cierren las inscripciones. `/evento generar_equipos` no aplica porque los equipos ya
-  quedan fijos desde la inscripción.
+  que abre el segundo formulario con los 5 roles (Tank, Healer, DPS x3). `num_equipos` es
+  opcional aquí y funciona como cupo máximo de equipos (vacío = sin límite).
 
 ### Fecha, hora e imagen
 
@@ -118,15 +115,14 @@ demás campos se abre un formulario (modal) con un campo de texto tipo párrafo 
 
 ### Flujo típico
 
-1. Un oficial ejecuta `/evento crear titulo:"Mítico+ semanal" tipo_inscripcion:Individual fecha:30/06/2026 hora:23:00 num_equipos:2 canal_publicacion:#eventos canal_inscripciones:#inscripciones-log`.
+1. Un oficial ejecuta `/evento crear titulo:"Mítico+ semanal" tipo_inscripcion:Individual fecha:30/06/2026 hora:23:00 canal_publicacion:#eventos canal_inscripciones:#inscripciones-log`.
 2. Se abre un formulario para escribir la descripción (con saltos de línea) y al enviarlo
    el bot publica el embed con botones en el canal elegido. Cada inscripción/baja se
    anuncia también en `canal_inscripciones` si se configuró, además de actualizar el embed.
 3. Cuando ya no se aceptan más inscritos: `/evento cerrar evento_id:1`.
-4. Si el evento es individual, el oficial genera los equipos: `/evento generar_equipos evento_id:1`.
-   Si es grupal, los equipos ya están formados desde la inscripción.
-5. Al terminar la actividad: `/evento registrar_ganador evento_id:1 numero_equipo:2`.
-   El bot anuncia al equipo ganador y marca el evento como finalizado.
+4. Si el evento es grupal, al terminar la actividad: `/evento registrar_ganador evento_id:1 numero_equipo:2`.
+   El bot anuncia al equipo ganador y marca el evento como finalizado. Los eventos
+   individuales se cierran y quedan así, sin ganador (son solo una lista de asistencia).
 
 ## 7. Persistencia y reinicios
 
@@ -163,13 +159,11 @@ implementan las mismas funciones, así que el resto del código no distingue cu�
 
 ## 8. Personalización rápida
 
-- **Restringir a un rol de oficial en vez de "Gestionar servidor":**
-  cambia el decorador `es_organizador()` en `cogs/eventos.py` por
-  `app_commands.checks.has_role("Oficial")`.
-- **Añadir más roles de WoW o especializaciones:** ajusta `utils/equipos.py`
-  (`normalizar_rol`) y el campo `rol` del Modal en `cogs/vistas.py`.
-- **Cambiar el máximo de equipos:** modifica el `app_commands.Range[int, 1, 20]`
-  en los comandos correspondientes.
+- **Cambiar el rol requerido para administrar eventos:** edita la constante
+  `ROL_OFICIAL` en `cogs/eventos.py` (debe coincidir exactamente con el nombre del
+  rol en Discord, mayúsculas incluidas).
+- **Cambiar el cupo máximo de equipos permitido:** modifica el
+  `app_commands.Range[int, 1, 20]` en los comandos correspondientes.
 
 ## 9. Base de datos (ya integrado)
 

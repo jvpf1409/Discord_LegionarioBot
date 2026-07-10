@@ -45,13 +45,10 @@ def construir_embed_evento(evento: dict) -> discord.Embed:
             )
     else:
         embed.add_field(name="Tipo", value="🙋 Individual", inline=True)
-        embed.add_field(name="Equipos previstos", value=str(evento["num_equipos"]), inline=True)
         embed.add_field(name="Inscritos", value=str(len(evento["participantes"])), inline=True)
 
         if evento["participantes"]:
-            lista = "\n".join(
-                f"• **{p['personaje']}** — <@{p['user_id']}>" for p in evento["participantes"]
-            )
+            lista = "\n".join(f"• <@{p['user_id']}>" for p in evento["participantes"])
             if len(lista) > 1000:
                 lista = lista[:1000] + "\n… (lista truncada)"
             embed.add_field(name="Participantes", value=lista, inline=False)
@@ -62,7 +59,7 @@ def construir_embed_evento(evento: dict) -> discord.Embed:
     if evento.get("imagen_url"):
         embed.set_image(url=evento["imagen_url"])
 
-    embed.set_footer(text=f"ID del evento: {evento['id']}")
+    #embed.set_footer(text=f"ID del evento: {evento['id']}")
     return embed
 
 
@@ -85,44 +82,6 @@ async def _anunciar_inscripcion(client: discord.Client, evento: dict, texto: str
             await canal.send(texto)
     except Exception:
         pass
-
-
-class InscripcionModal(discord.ui.Modal, title="Inscripción al evento"):
-    """Formulario de inscripción individual: solo el nombre del personaje."""
-
-    personaje = discord.ui.TextInput(
-        label="Nombre del personaje",
-        placeholder="Ej: Arkthar",
-        max_length=32,
-        required=True,
-    )
-
-    def __init__(self, evento_id: str):
-        super().__init__()
-        self.evento_id = evento_id
-
-    async def on_submit(self, interaction: discord.Interaction):
-        participante = {
-            "user_id": interaction.user.id,
-            "nombre_discord": str(interaction.user),
-            "personaje": self.personaje.value.strip(),
-        }
-
-        ok, mensaje = storage.agregar_participante(self.evento_id, participante)
-
-        await interaction.response.send_message(
-            ("✅ " if ok else "❌ ") + mensaje, ephemeral=True
-        )
-
-        if ok:
-            evento = storage.obtener_evento(self.evento_id)
-            await _actualizar_mensaje_evento(interaction.client, evento)
-            await _anunciar_inscripcion(
-                interaction.client,
-                evento,
-                f"📋 **{participante['personaje']}** ({interaction.user.mention}) se inscribió en "
-                f"**{evento['titulo']}**.",
-            )
 
 
 class EquipoRosterModal(discord.ui.Modal, title="Inscribir equipo (2/2)"):
@@ -252,7 +211,18 @@ class EventoView(discord.ui.View):
                 return
             await interaction.response.send_modal(NombreEquipoModal(self.evento_id))
         else:
-            await interaction.response.send_modal(InscripcionModal(self.evento_id))
+            participante = {"user_id": interaction.user.id, "nombre_discord": str(interaction.user)}
+            ok, mensaje = storage.agregar_participante(self.evento_id, participante)
+            await interaction.response.send_message(("✅ " if ok else "❌ ") + mensaje, ephemeral=True)
+
+            if ok:
+                evento = storage.obtener_evento(self.evento_id)
+                await _actualizar_mensaje_evento(interaction.client, evento)
+                await _anunciar_inscripcion(
+                    interaction.client,
+                    evento,
+                    f"📋 {interaction.user.mention} se inscribió en **{evento['titulo']}**.",
+                )
 
     async def _darse_de_baja(self, interaction: discord.Interaction):
         evento = storage.obtener_evento(self.evento_id)
