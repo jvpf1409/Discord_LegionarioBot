@@ -12,6 +12,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import storage
+from utils.anuncios import anunciar_publicacion
 from utils.permisos import es_organizador
 from utils.tiempo import parse_fecha_hora, ZONA_HORARIA
 from utils.wow_data import rol_de
@@ -69,6 +70,7 @@ class DescripcionRaidModal(discord.ui.Modal, title="Descripción de la raid"):
         self.creado_por = creado_por
 
     async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         raid_id = storage.crear_raid(
             titulo=self.titulo,
             descripcion=self.descripcion.value.strip(),
@@ -87,14 +89,19 @@ class DescripcionRaidModal(discord.ui.Modal, title="Descripción de la raid"):
             mensaje = await self.canal_publicacion.send(embed=embed, view=view)
         except discord.Forbidden:
             storage.actualizar_raid(raid_id, estado="cancelado")
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"❌ No tengo permiso para publicar en {self.canal_publicacion.mention}.", ephemeral=True
             )
             return
 
         storage.actualizar_raid(raid_id, mensaje_id=mensaje.id)
-        await interaction.response.send_message(
-            f"✅ Raid **{self.titulo}** publicada en {self.canal_publicacion.mention} (ID: {raid_id}).",
+        advertencia = await anunciar_publicacion(
+            interaction.client, interaction.guild, "Raid", self.titulo, mensaje
+        )
+        detalle_aviso = f"\n⚠️ {advertencia}" if advertencia else ""
+        await interaction.followup.send(
+            f"✅ Raid **{self.titulo}** publicada en {self.canal_publicacion.mention} "
+            f"(ID: {raid_id}).{detalle_aviso}",
             ephemeral=True,
         )
 
@@ -176,6 +183,7 @@ class Raids(commands.Cog):
             )
             return
 
+        await interaction.response.defer(ephemeral=True)
         fecha_hora_ts = int((datetime.now(ZoneInfo(ZONA_HORARIA)) + timedelta(days=3)).timestamp())
 
         raid_id = storage.crear_raid(
@@ -207,9 +215,14 @@ class Raids(commands.Cog):
         mensaje = await interaction.channel.send(embed=embed, view=view)
         storage.actualizar_raid(raid_id, mensaje_id=mensaje.id)
 
-        await interaction.response.send_message(
+        advertencia = await anunciar_publicacion(
+            interaction.client, interaction.guild, "Raid", titulo, mensaje
+        )
+        detalle_aviso = f"\n⚠️ {advertencia}" if advertencia else ""
+        await interaction.followup.send(
             f"✅ Raid de prueba publicada aquí mismo (ID: {raid_id}). "
-            f"Bórrala con `/raid cancelar raid_id:{raid_id}` cuando termines.",
+            f"Bórrala con `/raid cancelar raid_id:{raid_id}` cuando termines."
+            f"{detalle_aviso}",
             ephemeral=True,
         )
 

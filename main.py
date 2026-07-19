@@ -62,6 +62,7 @@ async def main():
     async with bot:
         await bot.load_extension("cogs.eventos")
         await bot.load_extension("cogs.raids")
+        await bot.load_extension("cogs.recordatorios")
         await bot.start(TOKEN)
 
 

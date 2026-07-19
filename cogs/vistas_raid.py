@@ -30,11 +30,11 @@ def construir_embed_raid(raid: dict) -> discord.Embed:
         embed.add_field(name="⏳ Faltan", value=f"<t:{ts}:R>", inline=True)
 
     estado_txt = {
-        "abierto": "✅ Inscripciones abiertas",
-        "cerrado": "🟠 Inscripciones cerradas",
-        "cancelado": "🚫 Cancelada",
+        "abierto": "Abierto",
+        "cerrado": "Cerrado",
+        "cancelado": "Cancelado",
     }[raid["estado"]]
-    embed.add_field(name="Estado", value=estado_txt, inline=True)
+    embed.add_field(name="Inscripciones", value=estado_txt, inline=True)
     embed.add_field(name="Inscritos", value=str(len(raid["inscritos"])), inline=True)
 
     conteos = {"tank": 0, "healer": 0, "melee": 0, "ranged": 0}

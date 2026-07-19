@@ -64,7 +64,6 @@ def crear_evento(
     descripcion: str,
     guild_id: int,
     canal_id: int,
-    num_equipos: int,
     creado_por: int,
     fecha_hora_ts: int,
     tipo_inscripcion: str = "individual",  # individual | grupal
@@ -79,7 +78,6 @@ def crear_evento(
         "canal_inscripciones_id": canal_inscripciones_id,
         "mensaje_id": None,
         "tipo_inscripcion": tipo_inscripcion,
-        "num_equipos": num_equipos,
         "fecha_hora_ts": fecha_hora_ts,
         "imagen_url": imagen_url,
         "estado": "abierto",  # abierto | cerrado | finalizado
@@ -87,6 +85,7 @@ def crear_evento(
         "participantes": [],   # (tipo individual) lista de dicts: user_id, nombre_discord, personaje
         "equipos": [],         # lista de equipos: {nombre_equipo, user_id, nombre_discord, integrantes: [...]}
         "ganador": None,       # indice de equipo o nombre
+        "recordatorio_enviado": False,
     }
     with _conectar() as conn:
         fila = conn.execute(
@@ -183,8 +182,6 @@ def agregar_equipo(evento_id: str, equipo: dict) -> tuple[bool, str]:
             data = dict(fila["data"])
             if data["estado"] != "abierto":
                 return False, "Las inscripciones para este evento están cerradas."
-            if data["num_equipos"] is not None and len(data["equipos"]) >= data["num_equipos"]:
-                return False, f"Ya se alcanzó el cupo máximo de {data['num_equipos']} equipos."
             for e in data["equipos"]:
                 if e["user_id"] == equipo["user_id"]:
                     return False, "Ya inscribiste un equipo en este evento."
@@ -236,6 +233,7 @@ def crear_raid(
         "estado": "abierto",  # abierto | cerrado | cancelado
         "creado_por": creado_por,
         "inscritos": [],  # {user_id, nombre_discord, clase, especializacion, rol}
+        "recordatorio_enviado": False,
     }
     with _conectar() as conn:
         fila = conn.execute(
