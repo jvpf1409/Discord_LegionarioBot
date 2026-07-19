@@ -3,6 +3,8 @@ Clases y especializaciones de WoW, con su categoría de rol para los
 contadores de /raid. Si tu comunidad usa otros nombres, ajusta esta lista.
 """
 
+import unicodedata
+
 from utils.iconos import icono
 
 # Emoji unicode de reserva (se usa si no hay un ícono personalizado subido
@@ -51,3 +53,29 @@ def rol_de(clase: str, especializacion: str) -> str:
         if nombre == especializacion:
             return rol
     return "melee"
+
+
+def _slug(texto: str) -> str:
+    texto = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
+    return texto.lower().replace(" ", "_").replace("-", "_")
+
+
+def nombre_icono_especializacion(clase: str, especializacion: str) -> str:
+    """Nombre de archivo/emoji esperado en assets/icons/ para esta clase+especialización."""
+    return f"{_slug(clase)}_{_slug(especializacion)}"
+
+
+def icono_clase(clase: str) -> str:
+    """Icono de clase; usa la primera especialización como reserva temporal."""
+    personalizado = icono(f"clase_{_slug(clase)}", "")
+    if personalizado:
+        return personalizado
+    especializaciones = CLASES.get(clase, [])
+    if especializaciones:
+        return icono_especializacion(clase, especializaciones[0][0])
+    return ""
+
+
+def icono_especializacion(clase: str, especializacion: str) -> str:
+    """Ícono personalizado de la especialización si existe, si no cadena vacía."""
+    return icono(nombre_icono_especializacion(clase, especializacion), "")

@@ -14,9 +14,24 @@ from discord.ext import commands
 from utils import storage
 from utils.permisos import es_organizador
 from utils.tiempo import parse_fecha_hora, ZONA_HORARIA
+from utils.wow_data import rol_de
 from cogs.vistas_raid import RaidView, construir_embed_raid
 
 logger = logging.getLogger(__name__)
+
+# Inscritos de ejemplo para /raid test: 2 tank, 2 healer, 3 melee, 3 ranged.
+INSCRITOS_DE_PRUEBA = [
+    ("Jugador 1", "Guerrero", "Protección"),
+    ("Jugador 2", "Monje", "Maestro Cervecero"),
+    ("Jugador 3", "Paladín", "Sagrado"),
+    ("Jugador 4", "Chamán", "Restauración"),
+    ("Jugador 5", "Pícaro", "Asesinato"),
+    ("Jugador 6", "Cazador de Demonios", "Asolamiento"),
+    ("Jugador 7", "Druida", "Feral"),
+    ("Jugador 8", "Mago", "Fuego"),
+    ("Jugador 9", "Cazador", "Puntería"),
+    ("Jugador 10", "Brujo", "Destrucción"),
+]
 
 
 class DescripcionRaidModal(discord.ui.Modal, title="Descripción de la raid"):
@@ -175,6 +190,16 @@ class Raids(commands.Cog):
             creado_por=interaction.user.id,
             imagen_url=imagen.url if imagen else None,
         )
+
+        for i, (nombre, clase, especializacion) in enumerate(INSCRITOS_DE_PRUEBA, start=1):
+            storage.inscribir_en_raid(raid_id, {
+                "user_id": -i,
+                "nombre_discord": nombre,
+                "clase": clase,
+                "especializacion": especializacion,
+                "rol": rol_de(clase, especializacion),
+            })
+
         raid = storage.obtener_raid(raid_id)
         embed = construir_embed_raid(raid)
         view = RaidView(raid_id, abierta=True)

@@ -7,7 +7,7 @@ select con un modal pero sí con otro mensaje/select) y botón para darse de baj
 import discord
 
 from utils import storage
-from utils.wow_data import CLASES, etiqueta_rol, rol_de
+from utils.wow_data import CLASES, etiqueta_rol, icono_clase, icono_especializacion, rol_de
 
 
 def construir_embed_raid(raid: dict) -> discord.Embed:
@@ -43,12 +43,18 @@ def construir_embed_raid(raid: dict) -> discord.Embed:
     resumen_roles = "  ".join(f"{etiqueta_rol(r)}: {conteos[r]}" for r in ("tank", "healer", "melee", "ranged"))
     embed.add_field(name="Roles", value=resumen_roles, inline=False)
 
+    def _linea_integrante(i: dict) -> str:
+        icono_spec = icono_especializacion(i["clase"], i["especializacion"])
+        icono_mostrado = icono_spec or icono_clase(i["clase"]) or "▫️"
+        return (
+            f"• {icono_mostrado} {i['clase']} "
+            f"{i['especializacion']} - {i['nombre_discord']}"
+        )
+
     for rol in ("tank", "healer", "melee", "ranged"):
         integrantes = [i for i in raid["inscritos"] if i["rol"] == rol]
         if integrantes:
-            lista = "\n".join(
-                f"• {i['nombre_discord']} — {i['clase']} ({i['especializacion']})" for i in integrantes
-            )
+            lista = "\n".join(_linea_integrante(i) for i in integrantes)
             if len(lista) > 1000:
                 lista = lista[:1000] + "\n… (lista truncada)"
             embed.add_field(name=etiqueta_rol(rol), value=lista, inline=True)
@@ -84,7 +90,11 @@ async def _anunciar_inscripcion_raid(client: discord.Client, raid: dict, texto: 
 class EspecialidadSelect(discord.ui.Select):
     def __init__(self, raid_id: str, clase: str):
         opciones = [
-            discord.SelectOption(label=especializacion, value=especializacion)
+            discord.SelectOption(
+                label=especializacion,
+                value=especializacion,
+                emoji=icono_especializacion(clase, especializacion) or None,
+            )
             for especializacion, _rol in CLASES[clase]
         ]
         super().__init__(placeholder="Selecciona tu especialización", options=opciones)
@@ -123,7 +133,14 @@ class EspecialidadView(discord.ui.View):
 
 class ClaseSelect(discord.ui.Select):
     def __init__(self, raid_id: str):
-        opciones = [discord.SelectOption(label=clase, value=clase) for clase in CLASES]
+        opciones = [
+            discord.SelectOption(
+                label=clase,
+                value=clase,
+                emoji=icono_clase(clase) or None,
+            )
+            for clase in CLASES
+        ]
         super().__init__(
             placeholder="Selecciona tu clase",
             options=opciones,

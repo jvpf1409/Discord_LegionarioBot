@@ -1,7 +1,7 @@
 {
   "next_id": 1,
   "eventos": {},
-  "next_raid_id": 6,
+  "next_raid_id": 9,
   "raids": {
     "1": {
       "id": "1",
@@ -88,6 +88,275 @@
       "estado": "cerrado",
       "creado_por": 442858646913679360,
       "inscritos": []
+    },
+    "6": {
+      "id": "6",
+      "titulo": "Raid de prueba",
+      "descripcion": "Esto es una publicación de **prueba** para revisar el formato. Bórrala cuando termines con `/raid cancelar`.",
+      "guild_id": 722257679178924123,
+      "canal_id": 722257679690760255,
+      "canal_inscripciones_id": null,
+      "mensaje_id": 1528419069420769393,
+      "fecha_hora_ts": 1784733101,
+      "imagen_url": null,
+      "estado": "abierto",
+      "creado_por": 442858646913679360,
+      "inscritos": [
+        {
+          "user_id": -1,
+          "nombre_discord": "Jugador 1",
+          "clase": "Guerrero",
+          "especializacion": "Protección",
+          "rol": "tank"
+        },
+        {
+          "user_id": -2,
+          "nombre_discord": "Jugador 2",
+          "clase": "Monje",
+          "especializacion": "Maestro Cervecero",
+          "rol": "tank"
+        },
+        {
+          "user_id": -3,
+          "nombre_discord": "Jugador 3",
+          "clase": "Paladín",
+          "especializacion": "Sagrado",
+          "rol": "healer"
+        },
+        {
+          "user_id": -4,
+          "nombre_discord": "Jugador 4",
+          "clase": "Chamán",
+          "especializacion": "Restauración",
+          "rol": "healer"
+        },
+        {
+          "user_id": -5,
+          "nombre_discord": "Jugador 5",
+          "clase": "Pícaro",
+          "especializacion": "Asesinato",
+          "rol": "melee"
+        },
+        {
+          "user_id": -6,
+          "nombre_discord": "Jugador 6",
+          "clase": "Cazador de Demonios",
+          "especializacion": "Asolamiento",
+          "rol": "melee"
+        },
+        {
+          "user_id": -7,
+          "nombre_discord": "Jugador 7",
+          "clase": "Druida",
+          "especializacion": "Feral",
+          "rol": "melee"
+        },
+        {
+          "user_id": -8,
+          "nombre_discord": "Jugador 8",
+          "clase": "Mago",
+          "especializacion": "Fuego",
+          "rol": "ranged"
+        },
+        {
+          "user_id": -9,
+          "nombre_discord": "Jugador 9",
+          "clase": "Cazador",
+          "especializacion": "Puntería",
+          "rol": "ranged"
+        },
+        {
+          "user_id": -10,
+          "nombre_discord": "Jugador 10",
+          "clase": "Brujo",
+          "especializacion": "Destrucción",
+          "rol": "ranged"
+        },
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "clase": "Cazador",
+          "especializacion": "Bestias",
+          "rol": "ranged"
+        }
+      ]
+    },
+    "7": {
+      "id": "7",
+      "titulo": "Raid de prueba",
+      "descripcion": "Esto es una publicación de **prueba** para revisar el formato. Bórrala cuando termines con `/raid cancelar`.",
+      "guild_id": 722257679178924123,
+      "canal_id": 722257679690760255,
+      "canal_inscripciones_id": null,
+      "mensaje_id": 1528421712050262158,
+      "fecha_hora_ts": 1784733731,
+      "imagen_url": null,
+      "estado": "abierto",
+      "creado_por": 442858646913679360,
+      "inscritos": [
+        {
+          "user_id": -1,
+          "nombre_discord": "Jugador 1",
+          "clase": "Guerrero",
+          "especializacion": "Protección",
+          "rol": "tank"
+        },
+        {
+          "user_id": -2,
+          "nombre_discord": "Jugador 2",
+          "clase": "Monje",
+          "especializacion": "Maestro Cervecero",
+          "rol": "tank"
+        },
+        {
+          "user_id": -3,
+          "nombre_discord": "Jugador 3",
+          "clase": "Paladín",
+          "especializacion": "Sagrado",
+          "rol": "healer"
+        },
+        {
+          "user_id": -4,
+          "nombre_discord": "Jugador 4",
+          "clase": "Chamán",
+          "especializacion": "Restauración",
+          "rol": "healer"
+        },
+        {
+          "user_id": -5,
+          "nombre_discord": "Jugador 5",
+          "clase": "Pícaro",
+          "especializacion": "Asesinato",
+          "rol": "melee"
+        },
+        {
+          "user_id": -6,
+          "nombre_discord": "Jugador 6",
+          "clase": "Cazador de Demonios",
+          "especializacion": "Asolamiento",
+          "rol": "melee"
+        },
+        {
+          "user_id": -7,
+          "nombre_discord": "Jugador 7",
+          "clase": "Druida",
+          "especializacion": "Feral",
+          "rol": "melee"
+        },
+        {
+          "user_id": -8,
+          "nombre_discord": "Jugador 8",
+          "clase": "Mago",
+          "especializacion": "Fuego",
+          "rol": "ranged"
+        },
+        {
+          "user_id": -9,
+          "nombre_discord": "Jugador 9",
+          "clase": "Cazador",
+          "especializacion": "Puntería",
+          "rol": "ranged"
+        },
+        {
+          "user_id": -10,
+          "nombre_discord": "Jugador 10",
+          "clase": "Brujo",
+          "especializacion": "Destrucción",
+          "rol": "ranged"
+        }
+      ]
+    },
+    "8": {
+      "id": "8",
+      "titulo": "Raid de prueba",
+      "descripcion": "Esto es una publicación de **prueba** para revisar el formato. Bórrala cuando termines con `/raid cancelar`.",
+      "guild_id": 722257679178924123,
+      "canal_id": 722257679690760255,
+      "canal_inscripciones_id": null,
+      "mensaje_id": 1528424093219553301,
+      "fecha_hora_ts": 1784734299,
+      "imagen_url": null,
+      "estado": "abierto",
+      "creado_por": 442858646913679360,
+      "inscritos": [
+        {
+          "user_id": -1,
+          "nombre_discord": "Jugador 1",
+          "clase": "Guerrero",
+          "especializacion": "Protección",
+          "rol": "tank"
+        },
+        {
+          "user_id": -2,
+          "nombre_discord": "Jugador 2",
+          "clase": "Monje",
+          "especializacion": "Maestro Cervecero",
+          "rol": "tank"
+        },
+        {
+          "user_id": -3,
+          "nombre_discord": "Jugador 3",
+          "clase": "Paladín",
+          "especializacion": "Sagrado",
+          "rol": "healer"
+        },
+        {
+          "user_id": -4,
+          "nombre_discord": "Jugador 4",
+          "clase": "Chamán",
+          "especializacion": "Restauración",
+          "rol": "healer"
+        },
+        {
+          "user_id": -5,
+          "nombre_discord": "Jugador 5",
+          "clase": "Pícaro",
+          "especializacion": "Asesinato",
+          "rol": "melee"
+        },
+        {
+          "user_id": -6,
+          "nombre_discord": "Jugador 6",
+          "clase": "Cazador de Demonios",
+          "especializacion": "Asolamiento",
+          "rol": "melee"
+        },
+        {
+          "user_id": -7,
+          "nombre_discord": "Jugador 7",
+          "clase": "Druida",
+          "especializacion": "Feral",
+          "rol": "melee"
+        },
+        {
+          "user_id": -8,
+          "nombre_discord": "Jugador 8",
+          "clase": "Mago",
+          "especializacion": "Fuego",
+          "rol": "ranged"
+        },
+        {
+          "user_id": -9,
+          "nombre_discord": "Jugador 9",
+          "clase": "Cazador",
+          "especializacion": "Puntería",
+          "rol": "ranged"
+        },
+        {
+          "user_id": -10,
+          "nombre_discord": "Jugador 10",
+          "clase": "Brujo",
+          "especializacion": "Destrucción",
+          "rol": "ranged"
+        },
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "clase": "Cazador",
+          "especializacion": "Bestias",
+          "rol": "ranged"
+        }
+      ]
     }
   }
 }

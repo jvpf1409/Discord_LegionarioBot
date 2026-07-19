@@ -67,6 +67,16 @@ GUILD_ID=tu_id_de_servidor   # opcional, recomendado durante pruebas
 python main.py
 ```
 
+Durante el desarrollo puedes usar recarga automática. El proceso del bot se
+reinicia cada vez que guardas un archivo `.py` o modificas `.env`:
+
+```bash
+python scripts/dev.py
+```
+
+Pulsa `Ctrl+C` para detenerlo. No se necesita ngrok porque el bot inicia una
+conexión saliente hacia Discord; no recibe webhooks HTTP en este proyecto.
+
 Si todo va bien verás algo como:
 ```
 ✅ Conectado como HermandadBot#1234 — 6 comandos sincronizados.

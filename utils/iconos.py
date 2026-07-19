@@ -34,21 +34,22 @@ async def cargar_iconos(bot: discord.Client):
         logger.exception("No se pudieron consultar los application emojis existentes")
         return
 
-    for archivo in os.listdir(ICONS_DIR):
-        nombre, ext = os.path.splitext(archivo)
-        if ext.lower() not in EXTENSIONES_VALIDAS:
-            continue
-
-        emoji = existentes.get(nombre)
-        if emoji is None:
-            try:
-                with open(os.path.join(ICONS_DIR, archivo), "rb") as f:
-                    emoji = await bot.create_application_emoji(name=nombre, image=f.read())
-            except discord.HTTPException:
-                logger.exception(f"No se pudo subir el ícono '{nombre}'")
+    for carpeta, _subcarpetas, archivos in os.walk(ICONS_DIR):
+        for archivo in archivos:
+            nombre, ext = os.path.splitext(archivo)
+            if ext.lower() not in EXTENSIONES_VALIDAS:
                 continue
 
-        ICONOS[nombre] = str(emoji)
+            emoji = existentes.get(nombre)
+            if emoji is None:
+                try:
+                    with open(os.path.join(carpeta, archivo), "rb") as f:
+                        emoji = await bot.create_application_emoji(name=nombre, image=f.read())
+                except discord.HTTPException:
+                    logger.exception(f"No se pudo subir el ícono '{nombre}'")
+                    continue
+
+            ICONOS[nombre] = str(emoji)
 
     if ICONOS:
         logger.info(f"Íconos personalizados cargados: {', '.join(ICONOS)}")
