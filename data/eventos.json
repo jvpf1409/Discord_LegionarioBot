@@ -1,197 +1,19 @@
 {
   "next_id": 1,
   "eventos": {},
-  "next_raid_id": 9,
+  "next_raid_id": 18,
   "raids": {
-    "1": {
-      "id": "1",
-      "titulo": "asdasd",
-      "descripcion": "asdasdasdasasdad",
-      "guild_id": 722257679178924123,
-      "canal_id": 722257679690760255,
-      "canal_inscripciones_id": null,
-      "mensaje_id": 1523397516085821442,
-      "fecha_hora_ts": 1783296000,
-      "imagen_url": "https://cdn.discordapp.com/ephemeral-attachments/1523164582766710805/1523397490433458197/images.jpeg?ex=6a4bf5f9&is=6a4aa479&hm=33b755c3e0d0c9ecad63c8be4cfee76c72df88c98d335e574183c94fb1db19d8&",
-      "estado": "cancelado",
-      "creado_por": 442858646913679360,
-      "inscritos": []
-    },
-    "2": {
-      "id": "2",
-      "titulo": "ASKHDKJADHKAJDH",
-      "descripcion": "asdfghjklñlkjhgfdsasdfghjklkjhgfdfghjk",
-      "guild_id": 722257679178924123,
-      "canal_id": 722257679690760255,
-      "canal_inscripciones_id": null,
-      "mensaje_id": 1523403767935013050,
-      "fecha_hora_ts": 1783296000,
-      "imagen_url": "https://cdn.discordapp.com/ephemeral-attachments/1523164582766710805/1523403740281835621/images.jpeg?ex=6a4bfbcb&is=6a4aaa4b&hm=42be081a633e7528873921c10243b014425005443535385e68d8bb7b1470b974&",
-      "estado": "cancelado",
-      "creado_por": 442858646913679360,
-      "inscritos": [
-        {
-          "user_id": 442858646913679360,
-          "nombre_discord": "Dostoievsky",
-          "clase": "Cazador",
-          "especializacion": "Bestias",
-          "rol": "ranged"
-        }
-      ]
-    },
-    "3": {
-      "id": "3",
-      "titulo": "zfghjklkjhgfdsasdfghjk",
-      "descripcion": "Esto es una publicación de **prueba** para revisar el formato. Bórrala cuando termines con `/raid cancelar`.",
-      "guild_id": 722257679178924123,
-      "canal_id": 722257679690760255,
-      "canal_inscripciones_id": null,
-      "mensaje_id": 1523406126610251892,
-      "fecha_hora_ts": 1783538011,
-      "imagen_url": "https://cdn.discordapp.com/ephemeral-attachments/1523164582766710805/1523406119987314809/images.jpeg?ex=6a4bfe02&is=6a4aac82&hm=d0894e77b3677c617c157d33a6e394591b6f93fb4db49b325c9c7b951f5a6170&",
-      "estado": "cancelado",
-      "creado_por": 442858646913679360,
-      "inscritos": []
-    },
-    "4": {
-      "id": "4",
-      "titulo": "zfghjklkjhgfdsasdfghjk",
-      "descripcion": "Esto es una publicación de **prueba** para revisar el formato. Bórrala cuando termines con `/raid cancelar`.",
-      "guild_id": 722257679178924123,
-      "canal_id": 722257679690760255,
-      "canal_inscripciones_id": null,
-      "mensaje_id": 1523407029912473641,
-      "fecha_hora_ts": 1783538226,
-      "imagen_url": "https://cdn.discordapp.com/ephemeral-attachments/1523164582766710805/1523407025000808539/images.jpeg?ex=6a4bfeda&is=6a4aad5a&hm=4909a0dfa6f5658ca12002e5da368ea6f6d2d5273342b2de4524138acac285c3&",
-      "estado": "cancelado",
-      "creado_por": 442858646913679360,
-      "inscritos": [
-        {
-          "user_id": 442858646913679360,
-          "nombre_discord": "Dostoievsky",
-          "clase": "Cazador",
-          "especializacion": "Bestias",
-          "rol": "ranged"
-        }
-      ]
-    },
-    "5": {
-      "id": "5",
-      "titulo": "Raid Test",
-      "descripcion": "Esto es una publicación de **prueba** para revisar el formato. Bórrala cuando termines con `/raid cancelar`.",
-      "guild_id": 722257679178924123,
-      "canal_id": 722257679690760255,
-      "canal_inscripciones_id": null,
-      "mensaje_id": 1523407672945410229,
-      "fecha_hora_ts": 1783538379,
-      "imagen_url": "https://cdn.discordapp.com/ephemeral-attachments/1523164582766710805/1523407667979227326/images.jpeg?ex=6a4bff73&is=6a4aadf3&hm=4a9b12c6e1ade8e819727fda8ccba838f703ceec11345cb986310f1d4ce1b5e9&",
-      "estado": "cerrado",
-      "creado_por": 442858646913679360,
-      "inscritos": []
-    },
-    "6": {
-      "id": "6",
+    "16": {
+      "id": "16",
       "titulo": "Raid de prueba",
       "descripcion": "Esto es una publicación de **prueba** para revisar el formato. Bórrala cuando termines con `/raid cancelar`.",
       "guild_id": 722257679178924123,
       "canal_id": 722257679690760255,
       "canal_inscripciones_id": null,
-      "mensaje_id": 1528419069420769393,
-      "fecha_hora_ts": 1784733101,
-      "imagen_url": null,
-      "estado": "abierto",
-      "creado_por": 442858646913679360,
-      "inscritos": [
-        {
-          "user_id": -1,
-          "nombre_discord": "Jugador 1",
-          "clase": "Guerrero",
-          "especializacion": "Protección",
-          "rol": "tank"
-        },
-        {
-          "user_id": -2,
-          "nombre_discord": "Jugador 2",
-          "clase": "Monje",
-          "especializacion": "Maestro Cervecero",
-          "rol": "tank"
-        },
-        {
-          "user_id": -3,
-          "nombre_discord": "Jugador 3",
-          "clase": "Paladín",
-          "especializacion": "Sagrado",
-          "rol": "healer"
-        },
-        {
-          "user_id": -4,
-          "nombre_discord": "Jugador 4",
-          "clase": "Chamán",
-          "especializacion": "Restauración",
-          "rol": "healer"
-        },
-        {
-          "user_id": -5,
-          "nombre_discord": "Jugador 5",
-          "clase": "Pícaro",
-          "especializacion": "Asesinato",
-          "rol": "melee"
-        },
-        {
-          "user_id": -6,
-          "nombre_discord": "Jugador 6",
-          "clase": "Cazador de Demonios",
-          "especializacion": "Asolamiento",
-          "rol": "melee"
-        },
-        {
-          "user_id": -7,
-          "nombre_discord": "Jugador 7",
-          "clase": "Druida",
-          "especializacion": "Feral",
-          "rol": "melee"
-        },
-        {
-          "user_id": -8,
-          "nombre_discord": "Jugador 8",
-          "clase": "Mago",
-          "especializacion": "Fuego",
-          "rol": "ranged"
-        },
-        {
-          "user_id": -9,
-          "nombre_discord": "Jugador 9",
-          "clase": "Cazador",
-          "especializacion": "Puntería",
-          "rol": "ranged"
-        },
-        {
-          "user_id": -10,
-          "nombre_discord": "Jugador 10",
-          "clase": "Brujo",
-          "especializacion": "Destrucción",
-          "rol": "ranged"
-        },
-        {
-          "user_id": 442858646913679360,
-          "nombre_discord": "Dostoievsky",
-          "clase": "Cazador",
-          "especializacion": "Bestias",
-          "rol": "ranged"
-        }
-      ]
-    },
-    "7": {
-      "id": "7",
-      "titulo": "Raid de prueba",
-      "descripcion": "Esto es una publicación de **prueba** para revisar el formato. Bórrala cuando termines con `/raid cancelar`.",
-      "guild_id": 722257679178924123,
-      "canal_id": 722257679690760255,
-      "canal_inscripciones_id": null,
-      "mensaje_id": 1528421712050262158,
-      "fecha_hora_ts": 1784733731,
-      "imagen_url": null,
-      "estado": "abierto",
+      "mensaje_id": 1528472655584563333,
+      "fecha_hora_ts": 1784745874,
+      "imagen_url": "https://cdn.discordapp.com/ephemeral-attachments/1523164582766710805/1528472635871330334/images.jpeg?ex=6a5e6c92&is=6a5d1b12&hm=712d82232c8e6155764154892dce890869302fa897612721a0cb53286b871d41&",
+      "estado": "cancelado",
       "creado_por": 442858646913679360,
       "inscritos": [
         {
@@ -264,99 +86,23 @@
           "especializacion": "Destrucción",
           "rol": "ranged"
         }
-      ]
+      ],
+      "recordatorio_enviado": false
     },
-    "8": {
-      "id": "8",
-      "titulo": "Raid de prueba",
-      "descripcion": "Esto es una publicación de **prueba** para revisar el formato. Bórrala cuando termines con `/raid cancelar`.",
+    "17": {
+      "id": "17",
+      "titulo": "Esporalia",
+      "descripcion": "Raid heroica",
       "guild_id": 722257679178924123,
       "canal_id": 722257679690760255,
       "canal_inscripciones_id": null,
-      "mensaje_id": 1528424093219553301,
-      "fecha_hora_ts": 1784734299,
-      "imagen_url": null,
+      "mensaje_id": 1528473050259914844,
+      "fecha_hora_ts": 1784487600,
+      "imagen_url": "https://cdn.discordapp.com/ephemeral-attachments/1523164582766710805/1528472999550910575/images.jpeg?ex=6a5e6ce8&is=6a5d1b68&hm=4068a0ac4f1ebc0d7014f2699f165b1310859af06aa2f2d5946760d9fe766dfa&",
       "estado": "abierto",
       "creado_por": 442858646913679360,
-      "inscritos": [
-        {
-          "user_id": -1,
-          "nombre_discord": "Jugador 1",
-          "clase": "Guerrero",
-          "especializacion": "Protección",
-          "rol": "tank"
-        },
-        {
-          "user_id": -2,
-          "nombre_discord": "Jugador 2",
-          "clase": "Monje",
-          "especializacion": "Maestro Cervecero",
-          "rol": "tank"
-        },
-        {
-          "user_id": -3,
-          "nombre_discord": "Jugador 3",
-          "clase": "Paladín",
-          "especializacion": "Sagrado",
-          "rol": "healer"
-        },
-        {
-          "user_id": -4,
-          "nombre_discord": "Jugador 4",
-          "clase": "Chamán",
-          "especializacion": "Restauración",
-          "rol": "healer"
-        },
-        {
-          "user_id": -5,
-          "nombre_discord": "Jugador 5",
-          "clase": "Pícaro",
-          "especializacion": "Asesinato",
-          "rol": "melee"
-        },
-        {
-          "user_id": -6,
-          "nombre_discord": "Jugador 6",
-          "clase": "Cazador de Demonios",
-          "especializacion": "Asolamiento",
-          "rol": "melee"
-        },
-        {
-          "user_id": -7,
-          "nombre_discord": "Jugador 7",
-          "clase": "Druida",
-          "especializacion": "Feral",
-          "rol": "melee"
-        },
-        {
-          "user_id": -8,
-          "nombre_discord": "Jugador 8",
-          "clase": "Mago",
-          "especializacion": "Fuego",
-          "rol": "ranged"
-        },
-        {
-          "user_id": -9,
-          "nombre_discord": "Jugador 9",
-          "clase": "Cazador",
-          "especializacion": "Puntería",
-          "rol": "ranged"
-        },
-        {
-          "user_id": -10,
-          "nombre_discord": "Jugador 10",
-          "clase": "Brujo",
-          "especializacion": "Destrucción",
-          "rol": "ranged"
-        },
-        {
-          "user_id": 442858646913679360,
-          "nombre_discord": "Dostoievsky",
-          "clase": "Cazador",
-          "especializacion": "Bestias",
-          "rol": "ranged"
-        }
-      ]
+      "inscritos": [],
+      "recordatorio_enviado": true
     }
   }
 }
