@@ -33,8 +33,7 @@ def construir_embed_evento(evento: dict) -> discord.Embed:
 
     if es_grupal:
         embed.add_field(name="Tipo", value="👥 Grupal", inline=True)
-        cupo = f"{len(evento['equipos'])}/{evento['num_equipos']}" if evento["num_equipos"] else str(len(evento["equipos"]))
-        embed.add_field(name="Equipos", value=cupo, inline=True)
+        embed.add_field(name="Equipos", value=str(len(evento["equipos"])), inline=True)
 
         for equipo in evento["equipos"]:
             lineas = "\n".join(f"• **{i['rol']}** — {i['personaje']}" for i in equipo["integrantes"])
@@ -204,11 +203,6 @@ class EventoView(discord.ui.View):
             return
 
         if evento["tipo_inscripcion"] == "grupal":
-            if evento["num_equipos"] is not None and len(evento["equipos"]) >= evento["num_equipos"]:
-                await interaction.response.send_message(
-                    f"❌ Ya se alcanzó el cupo máximo de {evento['num_equipos']} equipos.", ephemeral=True
-                )
-                return
             await interaction.response.send_modal(NombreEquipoModal(self.evento_id))
         else:
             participante = {"user_id": interaction.user.id, "nombre_discord": str(interaction.user)}

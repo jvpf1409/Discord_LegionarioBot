@@ -1,8 +1,8 @@
 # 🛡️ Bot de Actividades — Hermandad de World of Warcraft
 
 Bot de Discord en Python (discord.py) para gestionar eventos/actividades de tu hermandad:
-inscripciones con botones y formularios (Modals), cierre de inscripciones, generación
-balanceada de equipos y registro de ganadores.
+inscripciones con botones y formularios (Modals), cierre de inscripciones y registro
+de ganadores para eventos grupales.
 
 ## Estructura del proyecto
 
@@ -14,7 +14,6 @@ wow-bot/
 │   └── vistas.py            # Botones persistentes + Modal de inscripción
 ├── utils/
 │   ├── storage.py           # Persistencia en JSON
-│   └── equipos.py           # Algoritmo de balanceo de equipos por rol
 ├── data/
 │   └── eventos.json          # Base de datos (se genera/actualiza sola)
 ├── requirements.txt
@@ -56,7 +55,14 @@ cp .env.example .env
 ```
 DISCORD_TOKEN=tu_token_aqui
 GUILD_ID=tu_id_de_servidor   # opcional, recomendado durante pruebas
+CANAL_AVISOS_ID=id_del_canal_general       # opcional
+ROL_AVISOS_ID=id_del_rol_legionarios       # opcional
 ```
+
+Si configuras `CANAL_AVISOS_ID`, al crear un evento o raid el bot publicará
+automáticamente un aviso con el enlace directo a la publicación. Si además
+configuras `ROL_AVISOS_ID`, mencionará ese rol (por ejemplo, Legionarios).
+El mismo canal y rol reciben un único recordatorio 30 minutos antes del inicio.
 
 > `GUILD_ID` hace que los comandos slash aparezcan al instante en ese servidor.
 > Si lo dejas vacío, la sincronización global puede tardar hasta ~1 hora la primera vez.
@@ -80,9 +86,9 @@ constante `ROL_OFICIAL`).
 
 | Comando | Descripción |
 |---|---|
-| `/evento crear titulo tipo_inscripcion fecha hora canal_publicacion [num_equipos] [imagen] [canal_inscripciones]` | Abre un formulario para la descripción y publica el evento con embed + botones |
+| `/evento crear titulo tipo_inscripcion fecha hora canal_publicacion [imagen] [canal_inscripciones]` | Abre un formulario para la descripción y publica el evento con embed + botones |
 | `/evento cerrar evento_id` | Cierra inscripciones, deshabilita el botón |
-| `/evento registrar_ganador evento_id numero_equipo` | Solo eventos **grupales**: marca el equipo ganador y finaliza el evento |
+| `/evento registrar_ganador evento_id [ganador] [numero_equipo]` | Marca al participante o equipo ganador y finaliza el evento |
 | `/evento listar [estado]` | Lista eventos del servidor (abiertos/cerrados/finalizados) |
 | `/evento cancelar evento_id` | Cancela el evento por completo |
 
@@ -90,12 +96,13 @@ constante `ROL_OFICIAL`).
 
 - **Individual**: es solo una lista de asistencia, para eventos que no necesitan equipos.
   Al pulsar **Inscribirse** quedas anotado de inmediato con tu nombre de Discord — no hay
-  ningún formulario ni se pide `num_equipos`.
+  ningún formulario ni cantidad de equipos.
 - **Grupal**: cada inscripción registra un equipo completo ya formado. El formulario
   aparece en dos pasos: primero el nombre del equipo; al enviarlo aparece un botón
   **➡️ Continuar** (Discord no permite abrir un modal directamente desde otro modal),
-  que abre el segundo formulario con los 5 roles (Tank, Healer, DPS x3). `num_equipos` es
-  opcional aquí y funciona como cupo máximo de equipos (vacío = sin límite).
+  que abre el segundo formulario con los 5 roles (Tank, Healer, DPS x3). No existe
+  un límite de equipos: se pueden inscribir equipos hasta que se cierren las
+  inscripciones. Los equipos quedan fijos desde la inscripción.
 
 ### Fecha, hora e imagen
 
@@ -120,9 +127,9 @@ demás campos se abre un formulario (modal) con un campo de texto tipo párrafo 
    el bot publica el embed con botones en el canal elegido. Cada inscripción/baja se
    anuncia también en `canal_inscripciones` si se configuró, además de actualizar el embed.
 3. Cuando ya no se aceptan más inscritos: `/evento cerrar evento_id:1`.
-4. Si el evento es grupal, al terminar la actividad: `/evento registrar_ganador evento_id:1 numero_equipo:2`.
-   El bot anuncia al equipo ganador y marca el evento como finalizado. Los eventos
-   individuales se cierran y quedan así, sin ganador (son solo una lista de asistencia).
+4. Si es grupal, los equipos ya están formados desde la inscripción.
+5. Al terminar una actividad individual, usa `/evento registrar_ganador evento_id:1 ganador:@usuario`.
+   Para una grupal, usa `/evento registrar_ganador evento_id:1 numero_equipo:2`.
 
 ## 7. Persistencia y reinicios
 
@@ -160,10 +167,10 @@ implementan las mismas funciones, así que el resto del código no distingue cu�
 ## 8. Personalización rápida
 
 - **Cambiar el rol requerido para administrar eventos:** edita la constante
-  `ROL_OFICIAL` en `cogs/eventos.py` (debe coincidir exactamente con el nombre del
+  `ROL_OFICIAL` en `utils/permisos.py` (debe coincidir exactamente con el nombre del
   rol en Discord, mayúsculas incluidas).
-- **Cambiar el cupo máximo de equipos permitido:** modifica el
-  `app_commands.Range[int, 1, 20]` en los comandos correspondientes.
+- **Modificar la composición de equipos grupales:** ajusta los campos de
+  `EquipoRosterModal` en `cogs/vistas.py`.
 
 ## 9. Base de datos (ya integrado)
 
