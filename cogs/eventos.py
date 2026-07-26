@@ -248,7 +248,8 @@ class Eventos(commands.Cog):
     @evento_group.command(name="registrar_ganador", description="Registra al ganador y finaliza el evento")
     @app_commands.describe(
         evento_id="ID del evento",
-        ganador="Participante ganador (solo para eventos individuales)",
+        ganador="Usuario ganador (opcional, solo para eventos individuales)",
+        ganador_texto="Nombre o texto libre del ganador (alternativa a seleccionar un usuario)",
         numero_equipo="Número del equipo ganador (solo para eventos grupales)",
     )
     @es_organizador()
@@ -257,6 +258,7 @@ class Eventos(commands.Cog):
         interaction: discord.Interaction,
         evento_id: str,
         ganador: discord.Member = None,
+        ganador_texto: app_commands.Range[str, 1, 200] = None,
         numero_equipo: app_commands.Range[int, 1, 20] = None,
     ):
         evento = storage.obtener_evento(evento_id)
@@ -284,22 +286,39 @@ class Eventos(commands.Cog):
                 f"• **{i['rol']}** — {i['personaje']}" for i in equipo_ganador["integrantes"]
             ) or "_(sin integrantes)_"
         else:
-            if ganador is None:
+            if ganador is None and ganador_texto is None:
                 await interaction.response.send_message(
-                    "❌ Selecciona `ganador` para este evento individual.", ephemeral=True
+                    "❌ Selecciona `ganador` o escribe `ganador_texto` para este evento individual.",
+                    ephemeral=True,
                 )
                 return
-            participante = next(
-                (p for p in evento["participantes"] if p["user_id"] == ganador.id), None
-            )
-            if participante is None:
+            if ganador is not None and ganador_texto is not None:
                 await interaction.response.send_message(
-                    "❌ Ese usuario no está inscrito en el evento.", ephemeral=True
+                    "❌ Usa solo una opción: `ganador` o `ganador_texto`.",
+                    ephemeral=True,
                 )
                 return
-            nombre_ganador = ganador.mention
+
+            if ganador is not None:
+                participante = next(
+                    (p for p in evento["participantes"] if p["user_id"] == ganador.id), None
+                )
+                if participante is None:
+                    await interaction.response.send_message(
+                        "❌ Ese usuario no está inscrito en el evento.", ephemeral=True
+                    )
+                    return
+                nombre_ganador = ganador.mention
+            else:
+                nombre_ganador = ganador_texto.strip()
+                if not nombre_ganador:
+                    await interaction.response.send_message(
+                        "❌ `ganador_texto` no puede estar vacío.", ephemeral=True
+                    )
+                    return
+
             detalle_nombre = "Ganador"
-            detalle = ganador.mention
+            detalle = nombre_ganador
         storage.actualizar_evento(evento_id, estado="finalizado", ganador=nombre_ganador)
 
         evento = storage.obtener_evento(evento_id)
