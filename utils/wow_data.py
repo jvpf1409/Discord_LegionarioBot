@@ -43,7 +43,7 @@ CLASES = {
     "Brujo": [("Aflicción", "ranged"), ("Demonología", "ranged"), ("Destrucción", "ranged")],
     "Monje": [("Maestro Cervecero", "tank"), ("Viajero del Viento", "melee"), ("Tejedor de Niebla", "healer")],
     "Druida": [("Equilibrio", "ranged"), ("Feral", "melee"), ("Guardián", "tank"), ("Restauración", "healer")],
-    "Cazador de Demonios": [("Asolamiento", "melee"), ("Venganza", "tank")],
+    "Cazador de Demonios": [("Asolamiento", "melee"), ("Venganza", "tank"), ("Devorador", "ranged")],
     "Evocador": [("Devastación", "ranged"), ("Preservación", "healer"), ("Aumento", "ranged")],
 }
 
