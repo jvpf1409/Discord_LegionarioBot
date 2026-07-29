@@ -141,6 +141,97 @@ class Raids(commands.Cog):
         )
         await interaction.response.send_modal(modal)
 
+    # ---------------------- DUPLICAR ----------------------
+    @raid_group.command(
+        name="duplicar",
+        description="Duplica una raid cambiando solamente su fecha y hora",
+    )
+    @app_commands.describe(
+        raid_id="ID de la raid que quieres duplicar",
+        fecha="Nueva fecha en formato DD/MM/AAAA (ej: 07/08/2026)",
+        hora="Nueva hora en formato 24h HH:MM (ej: 22:00)",
+    )
+    @es_organizador()
+    async def duplicar(
+        self,
+        interaction: discord.Interaction,
+        raid_id: str,
+        fecha: str,
+        hora: str,
+    ):
+        raid_original = storage.obtener_raid(raid_id)
+        if raid_original is None or raid_original.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message(
+                "❌ No existe esa raid en este servidor.", ephemeral=True
+            )
+            return
+
+        try:
+            fecha_hora_ts = parse_fecha_hora(fecha, hora)
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Fecha u hora inválidas. Usa `DD/MM/AAAA` para la fecha y "
+                "`HH:MM` (24h) para la hora.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        canal_publicacion = self.bot.get_channel(raid_original["canal_id"])
+        if canal_publicacion is None:
+            try:
+                canal_publicacion = await self.bot.fetch_channel(raid_original["canal_id"])
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                canal_publicacion = None
+
+        if not isinstance(canal_publicacion, discord.abc.Messageable):
+            await interaction.followup.send(
+                "❌ No pude encontrar el canal donde se publicó la raid original.",
+                ephemeral=True,
+            )
+            return
+
+        nueva_raid_id = storage.crear_raid(
+            titulo=raid_original["titulo"],
+            descripcion=raid_original["descripcion"],
+            guild_id=interaction.guild_id,
+            canal_id=raid_original["canal_id"],
+            fecha_hora_ts=fecha_hora_ts,
+            creado_por=interaction.user.id,
+            canal_inscripciones_id=raid_original.get("canal_inscripciones_id"),
+            imagen_url=raid_original.get("imagen_url"),
+        )
+        nueva_raid = storage.obtener_raid(nueva_raid_id)
+
+        try:
+            mensaje = await canal_publicacion.send(
+                embed=construir_embed_raid(nueva_raid),
+                view=RaidView(nueva_raid_id, abierta=True),
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            storage.actualizar_raid(nueva_raid_id, estado="cancelado")
+            await interaction.followup.send(
+                "❌ No pude publicar la copia en el canal de la raid original.",
+                ephemeral=True,
+            )
+            return
+
+        storage.actualizar_raid(nueva_raid_id, mensaje_id=mensaje.id)
+        advertencia = await anunciar_publicacion(
+            interaction.client,
+            interaction.guild,
+            "Raid",
+            raid_original["titulo"],
+            mensaje,
+        )
+        detalle_aviso = f"\n⚠️ {advertencia}" if advertencia else ""
+        await interaction.followup.send(
+            f"✅ Raid **{raid_original['titulo']}** duplicada y publicada "
+            f"(ID original: {raid_id}, ID nuevo: {nueva_raid_id}).{detalle_aviso}",
+            ephemeral=True,
+        )
+
     # ---------------------- CERRAR ----------------------
     @raid_group.command(name="cerrar", description="Cierra las inscripciones de una raid")
     @app_commands.describe(raid_id="ID de la raid a cerrar")
@@ -212,6 +303,7 @@ class Raids(commands.Cog):
 
     # Manejo de errores de permisos para todo el grupo
     @crear.error
+    @duplicar.error
     @cerrar.error
     @cancelar.error
     async def on_permission_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):

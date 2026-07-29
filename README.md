@@ -91,6 +91,7 @@ constante `ROL_OFICIAL`).
 | `/evento registrar_ganador evento_id [ganador] [ganador_texto] [numero_equipo]` | Marca al usuario, texto libre o equipo ganador y finaliza el evento |
 | `/evento listar [estado]` | Lista eventos del servidor (abiertos/cerrados/finalizados) |
 | `/evento cancelar evento_id` | Cancela el evento por completo |
+| `/raid duplicar raid_id fecha hora` | Duplica una raid conservando sus datos y canales, pero con una fecha y hora nuevas |
 
 ### Tipos de inscripción
 
