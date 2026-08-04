@@ -409,44 +409,6 @@ class Formularios(commands.Cog):
         for inicio in range(10, len(embeds), 10):
             await interaction.followup.send(embeds=embeds[inicio:inicio + 10])
 
-    @pvp.command(name="prueba", description="Genera estadísticas PvP simuladas sin guardar respuestas")
-    @app_commands.describe(cantidad="Cantidad de inscripciones ficticias (entre 1 y 500)")
-    @es_organizador()
-    async def prueba(
-        self,
-        interaction: discord.Interaction,
-        cantidad: app_commands.Range[int, 1, 500] = 100,
-    ):
-        combinaciones = [
-            (clase, especializacion, rol)
-            for clase, especializaciones in CLASES.items()
-            for especializacion, rol in especializaciones
-        ]
-        respuestas = []
-        for indice in range(cantidad):
-            clase, especializacion, rol = combinaciones[indice % len(combinaciones)]
-            respuestas.append(
-                {
-                    "user_id": -(indice + 1),
-                    "nombre_discord": f"Usuario de prueba {indice + 1}",
-                    "personaje": f"Personaje{indice + 1}",
-                    "clase": clase,
-                    "especializacion": especializacion,
-                    "rol": rol,
-                    "nivel": NIVELES[indice % len(NIVELES)],
-                }
-            )
-        formulario_prueba = {
-            "id": "PRUEBA",
-            "titulo": f"Vista previa con {cantidad} inscripciones simuladas",
-            "respuestas": respuestas,
-        }
-        await interaction.response.send_message(
-            content="🧪 Estos datos son simulados y no se guardaron en la base de datos.",
-            embed=construir_estadisticas(formulario_prueba),
-            ephemeral=True,
-        )
-
     @pvp.command(name="cerrar", description="Cierra un formulario PvP")
     @app_commands.describe(formulario_id="ID indicado al publicar el formulario")
     @es_organizador()
@@ -468,7 +430,6 @@ class Formularios(commands.Cog):
     @publicar.error
     @estadisticas.error
     @inscritos.error
-    @prueba.error
     @cerrar.error
     async def error_permisos(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         mensaje = f"🚫 Necesitas el rol **{ROL_OFICIAL}** para usar este comando."

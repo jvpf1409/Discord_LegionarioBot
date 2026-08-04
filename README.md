@@ -187,7 +187,6 @@ Los oficiales pueden publicar una encuesta persistente para conocer el interés 
 - `/form pvp publicar`: publica el formulario en el mismo canal donde se ejecuta el comando. Cada persona puede inscribir un máximo de dos personajes indicando nombre, clase, especialización y nivel (`Principiante`, `Intermedio` o `Experto`). Volver a inscribir el mismo nombre actualiza ese personaje.
 - `/form pvp estadisticas formulario_id:<id>`: muestra todos los totales por rol (Tank, Healer y DPS), clase, especialización y nivel de conocimiento.
 - `/form pvp inscritos formulario_id:<id>`: muestra solamente las personas inscritas, con su nombre de Discord y los datos de sus personajes.
-- `/form pvp prueba cantidad:<n>`: muestra una vista previa con entre 1 y 500 inscripciones ficticias, sin guardarlas en la base de datos.
 - `/form pvp cerrar formulario_id:<id>`: cierra el formulario y desactiva sus botones.
 
 Los comandos requieren el rol `Legionario Oficial`. Los participantes usan **Inscribir personaje** y pueden retirar uno de sus personajes mientras el formulario siga abierto. Las estadísticas muestran el nombre visible de Discord junto a cada personaje inscrito.
