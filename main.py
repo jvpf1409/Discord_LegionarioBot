@@ -16,6 +16,7 @@ from utils import storage
 from utils.iconos import cargar_iconos
 from cogs.vistas import EventoView
 from cogs.vistas_raid import RaidView
+from cogs.pvp import PvpView
 
 load_dotenv()
 
@@ -48,6 +49,10 @@ async def on_ready():
             abierta = raid["estado"] == "abierto"
             bot.add_view(RaidView(raid["id"], abierta=abierta), message_id=raid["mensaje_id"])
 
+    for formulario in storage.listar_todos_los_formularios():
+        if formulario["estado"] == "abierto" and formulario.get("mensaje_id"):
+            bot.add_view(PvpView(formulario["id"], abierto=True), message_id=formulario["mensaje_id"])
+
     if GUILD_ID:
         guild = discord.Object(id=int(GUILD_ID))
         bot.tree.copy_global_to(guild=guild)
@@ -63,6 +68,7 @@ async def main():
         await bot.load_extension("cogs.eventos")
         await bot.load_extension("cogs.raids")
         await bot.load_extension("cogs.recordatorios")
+        await bot.load_extension("cogs.pvp")
         await bot.start(TOKEN)
 
 

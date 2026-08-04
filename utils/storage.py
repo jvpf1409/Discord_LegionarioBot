@@ -26,6 +26,8 @@ if os.getenv("DATABASE_URL"):
         actualizar_raid,
         inscribir_en_raid,
         quitar_de_raid,
+        crear_formulario_pvp, obtener_formulario, listar_todos_los_formularios,
+        actualizar_formulario, responder_formulario, quitar_respuesta_formulario,
     )
 else:
     from utils.storage_json import (
@@ -46,4 +48,6 @@ else:
         actualizar_raid,
         inscribir_en_raid,
         quitar_de_raid,
+        crear_formulario_pvp, obtener_formulario, listar_todos_los_formularios,
+        actualizar_formulario, responder_formulario, quitar_respuesta_formulario,
     )

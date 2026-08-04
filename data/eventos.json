@@ -67,5 +67,194 @@
       "equipos": [],
       "ganador": null
     }
-  }
+  },
+  "raids": {},
+  "next_raid_id": 1,
+  "formularios": {
+    "1": {
+      "id": "1",
+      "tipo": "pvp",
+      "titulo": "Estas Interesado en PvP?",
+      "descripcion": "Dinos tu nivel de conocimiento en PvP",
+      "guild_id": 722257679178924123,
+      "canal_id": 722257679690760255,
+      "mensaje_id": 1534036202100097147,
+      "creado_por": 442858646913679360,
+      "estado": "abierto",
+      "respuestas": [
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "clase": "Cazador",
+          "especializacion": "Bestias",
+          "rol": "ranged",
+          "nivel": "Principiante"
+        }
+      ]
+    },
+    "2": {
+      "id": "2",
+      "tipo": "pvp",
+      "titulo": "Escuelita de PvP",
+      "descripcion": "Inscribete si estas interesado y dinos tu nivel de conocimiento",
+      "guild_id": 722257679178924123,
+      "canal_id": 722257679690760255,
+      "mensaje_id": 1534038605666717910,
+      "creado_por": 442858646913679360,
+      "estado": "abierto",
+      "respuestas": [
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "clase": "Cazador",
+          "especializacion": "Bestias",
+          "rol": "ranged",
+          "nivel": "Principiante"
+        }
+      ]
+    },
+    "3": {
+      "id": "3",
+      "tipo": "pvp",
+      "titulo": "Escuelita PvP",
+      "descripcion": "Inscribete",
+      "guild_id": 722257679178924123,
+      "canal_id": 722257679690760255,
+      "mensaje_id": 1534042226903220385,
+      "creado_por": 442858646913679360,
+      "estado": "abierto",
+      "respuestas": [
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "personaje": "Nisamare",
+          "clase": "Druida",
+          "especializacion": "Equilibrio",
+          "rol": "ranged",
+          "nivel": "Intermedio"
+        },
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "personaje": "Alfombrita",
+          "clase": "Cazador",
+          "especializacion": "Bestias",
+          "rol": "ranged",
+          "nivel": "Principiante"
+        }
+      ]
+    },
+    "4": {
+      "id": "4",
+      "tipo": "pvp",
+      "titulo": "Escuelita PvP",
+      "descripcion": "Hola :D",
+      "guild_id": 722257679178924123,
+      "canal_id": 958894773505261598,
+      "mensaje_id": 1534042992086614099,
+      "creado_por": 442858646913679360,
+      "estado": "abierto",
+      "respuestas": [
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "personaje": "Alfombrita",
+          "clase": "Cazador",
+          "especializacion": "Bestias",
+          "rol": "ranged",
+          "nivel": "Principiante"
+        },
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "personaje": "Nisamare",
+          "clase": "Druida",
+          "especializacion": "Equilibrio",
+          "rol": "ranged",
+          "nivel": "Intermedio"
+        },
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "personaje": "Thrall",
+          "clase": "Guerrero",
+          "especializacion": "Furia",
+          "rol": "melee",
+          "nivel": "Experto"
+        }
+      ]
+    },
+    "5": {
+      "id": "5",
+      "tipo": "pvp",
+      "titulo": "Escuelita PvP",
+      "descripcion": "Te enseñamos a jugar PvP",
+      "guild_id": 722257679178924123,
+      "canal_id": 1534043975550373969,
+      "mensaje_id": 1534044438156939425,
+      "creado_por": 442858646913679360,
+      "estado": "abierto",
+      "respuestas": [
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "personaje": "Alfombrita",
+          "clase": "Cazador",
+          "especializacion": "Bestias",
+          "rol": "ranged",
+          "nivel": "Principiante"
+        },
+        {
+          "user_id": 442858832063102996,
+          "nombre_discord": "Arkthar",
+          "personaje": "Priest",
+          "clase": "Sacerdote",
+          "especializacion": "Disciplina",
+          "rol": "healer",
+          "nivel": "Experto"
+        },
+        {
+          "user_id": 442858832063102996,
+          "nombre_discord": "Arkthar",
+          "personaje": "Arkthar",
+          "clase": "Monje",
+          "especializacion": "Tejedor de Niebla",
+          "rol": "healer",
+          "nivel": "Experto"
+        }
+      ]
+    },
+    "6": {
+      "id": "6",
+      "tipo": "pvp",
+      "titulo": "Escuela PvP",
+      "descripcion": "Hola",
+      "guild_id": 722257679178924123,
+      "canal_id": 1534043975550373969,
+      "mensaje_id": 1534045850945454183,
+      "creado_por": 442858646913679360,
+      "estado": "abierto",
+      "respuestas": [
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "personaje": "Alfombrita",
+          "clase": "Cazador",
+          "especializacion": "Bestias",
+          "rol": "ranged",
+          "nivel": "Principiante"
+        },
+        {
+          "user_id": 442858646913679360,
+          "nombre_discord": "Dostoievsky",
+          "personaje": "Nisamare",
+          "clase": "Druida",
+          "especializacion": "Equilibrio",
+          "rol": "ranged",
+          "nivel": "Intermedio"
+        }
+      ]
+    }
+  },
+  "next_formulario_id": 7
 }

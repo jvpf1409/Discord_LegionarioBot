@@ -48,6 +48,15 @@ def _asegurar_tabla():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS formularios (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                data JSONB NOT NULL
+            )
+            """
+        )
 
 
 _asegurar_tabla()
@@ -319,3 +328,101 @@ def quitar_de_raid(raid_id: str, user_id: int) -> bool:
             data["inscritos"] = [i for i in data["inscritos"] if i["user_id"] != user_id]
             conn.execute("UPDATE raids SET data = %s WHERE id = %s", (Json(data), int(raid_id)))
     return len(data["inscritos"]) < antes
+
+
+# Formularios PvP
+def _fila_a_formulario(fila) -> dict:
+    formulario = dict(fila["data"])
+    formulario["id"] = str(fila["id"])
+    return formulario
+
+
+def crear_formulario_pvp(titulo: str, descripcion: str, guild_id: int, canal_id: int, creado_por: int) -> str:
+    data = {
+        "tipo": "pvp", "titulo": titulo, "descripcion": descripcion,
+        "guild_id": guild_id, "canal_id": canal_id, "mensaje_id": None,
+        "creado_por": creado_por, "estado": "abierto", "respuestas": [],
+    }
+    with _conectar() as conn:
+        fila = conn.execute(
+            "INSERT INTO formularios (guild_id, data) VALUES (%s, %s) RETURNING id",
+            (guild_id, Json(data)),
+        ).fetchone()
+    return str(fila["id"])
+
+
+def obtener_formulario(formulario_id: str) -> dict | None:
+    with _conectar() as conn:
+        fila = conn.execute("SELECT id, data FROM formularios WHERE id = %s", (int(formulario_id),)).fetchone()
+    return _fila_a_formulario(fila) if fila else None
+
+
+def listar_todos_los_formularios() -> list[dict]:
+    with _conectar() as conn:
+        filas = conn.execute("SELECT id, data FROM formularios ORDER BY id").fetchall()
+    return [_fila_a_formulario(f) for f in filas]
+
+
+def actualizar_formulario(formulario_id: str, **cambios):
+    with _conectar() as conn:
+        with conn.transaction():
+            fila = conn.execute("SELECT data FROM formularios WHERE id = %s FOR UPDATE", (int(formulario_id),)).fetchone()
+            if fila is None:
+                return None
+            data = dict(fila["data"])
+            data.update(cambios)
+            conn.execute("UPDATE formularios SET data = %s WHERE id = %s", (Json(data), int(formulario_id)))
+    return obtener_formulario(formulario_id)
+
+
+def responder_formulario(formulario_id: str, respuesta: dict) -> tuple[bool, str]:
+    with _conectar() as conn:
+        with conn.transaction():
+            fila = conn.execute("SELECT data FROM formularios WHERE id = %s FOR UPDATE", (int(formulario_id),)).fetchone()
+            if fila is None:
+                return False, "El formulario no existe."
+            data = dict(fila["data"])
+            if data["estado"] != "abierto":
+                return False, "El formulario está cerrado."
+            personaje = respuesta.get("personaje", "").strip().casefold()
+            actualizada = any(
+                r["user_id"] == respuesta["user_id"]
+                and r.get("personaje", "").strip().casefold() == personaje
+                for r in data["respuestas"]
+            )
+            personajes_del_usuario = sum(
+                1 for r in data["respuestas"] if r["user_id"] == respuesta["user_id"]
+            )
+            if not actualizada and personajes_del_usuario >= 2:
+                return False, "Puedes inscribir un máximo de 2 personajes."
+            data["respuestas"] = [
+                r for r in data["respuestas"]
+                if not (
+                    r["user_id"] == respuesta["user_id"]
+                    and r.get("personaje", "").strip().casefold() == personaje
+                )
+            ]
+            data["respuestas"].append(respuesta)
+            conn.execute("UPDATE formularios SET data = %s WHERE id = %s", (Json(data), int(formulario_id)))
+    return True, "Personaje actualizado." if actualizada else "Personaje inscrito."
+
+
+def quitar_respuesta_formulario(formulario_id: str, user_id: int, personaje: str | None = None) -> bool:
+    with _conectar() as conn:
+        with conn.transaction():
+            fila = conn.execute("SELECT data FROM formularios WHERE id = %s FOR UPDATE", (int(formulario_id),)).fetchone()
+            if fila is None:
+                return False
+            data = dict(fila["data"])
+            if data["estado"] != "abierto":
+                return False
+            antes = len(data["respuestas"])
+            data["respuestas"] = [
+                r for r in data["respuestas"]
+                if not (
+                    r["user_id"] == user_id
+                    and (personaje is None or r.get("personaje", "").casefold() == personaje.casefold())
+                )
+            ]
+            conn.execute("UPDATE formularios SET data = %s WHERE id = %s", (Json(data), int(formulario_id)))
+    return len(data["respuestas"]) < antes

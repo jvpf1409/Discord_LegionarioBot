@@ -16,7 +16,8 @@ def _asegurar_archivo():
     if not os.path.exists(DATA_PATH):
         with open(DATA_PATH, "w", encoding="utf-8") as f:
             json.dump(
-                {"next_id": 1, "eventos": {}, "next_raid_id": 1, "raids": {}},
+                {"next_id": 1, "eventos": {}, "next_raid_id": 1, "raids": {},
+                 "next_formulario_id": 1, "formularios": {}},
                 f, ensure_ascii=False, indent=2,
             )
 
@@ -28,6 +29,8 @@ def cargar_datos() -> dict:
             data = json.load(f)
     data.setdefault("raids", {})
     data.setdefault("next_raid_id", 1)
+    data.setdefault("formularios", {})
+    data.setdefault("next_formulario_id", 1)
     return data
 
 
@@ -257,3 +260,83 @@ def quitar_de_raid(raid_id: str, user_id: int) -> bool:
     raid["inscritos"] = [i for i in raid["inscritos"] if i["user_id"] != user_id]
     guardar_datos(data)
     return len(raid["inscritos"]) < antes
+
+
+# Formularios PvP
+def crear_formulario_pvp(titulo: str, descripcion: str, guild_id: int, canal_id: int, creado_por: int) -> str:
+    data = cargar_datos()
+    formulario_id = str(data["next_formulario_id"])
+    data["next_formulario_id"] += 1
+    data["formularios"][formulario_id] = {
+        "id": formulario_id, "tipo": "pvp", "titulo": titulo,
+        "descripcion": descripcion, "guild_id": guild_id, "canal_id": canal_id,
+        "mensaje_id": None, "creado_por": creado_por, "estado": "abierto",
+        "respuestas": [],
+    }
+    guardar_datos(data)
+    return formulario_id
+
+
+def obtener_formulario(formulario_id: str) -> dict | None:
+    return cargar_datos()["formularios"].get(str(formulario_id))
+
+
+def listar_todos_los_formularios() -> list[dict]:
+    return sorted(cargar_datos()["formularios"].values(), key=lambda f: int(f["id"]))
+
+
+def actualizar_formulario(formulario_id: str, **cambios):
+    data = cargar_datos()
+    formulario = data["formularios"].get(str(formulario_id))
+    if formulario is None:
+        return None
+    formulario.update(cambios)
+    guardar_datos(data)
+    return formulario
+
+
+def responder_formulario(formulario_id: str, respuesta: dict) -> tuple[bool, str]:
+    data = cargar_datos()
+    formulario = data["formularios"].get(str(formulario_id))
+    if formulario is None:
+        return False, "El formulario no existe."
+    if formulario["estado"] != "abierto":
+        return False, "El formulario está cerrado."
+    personaje = respuesta.get("personaje", "").strip().casefold()
+    actualizada = any(
+        r["user_id"] == respuesta["user_id"]
+        and r.get("personaje", "").strip().casefold() == personaje
+        for r in formulario["respuestas"]
+    )
+    personajes_del_usuario = sum(
+        1 for r in formulario["respuestas"] if r["user_id"] == respuesta["user_id"]
+    )
+    if not actualizada and personajes_del_usuario >= 2:
+        return False, "Puedes inscribir un máximo de 2 personajes."
+    formulario["respuestas"] = [
+        r for r in formulario["respuestas"]
+        if not (
+            r["user_id"] == respuesta["user_id"]
+            and r.get("personaje", "").strip().casefold() == personaje
+        )
+    ]
+    formulario["respuestas"].append(respuesta)
+    guardar_datos(data)
+    return True, "Personaje actualizado." if actualizada else "Personaje inscrito."
+
+
+def quitar_respuesta_formulario(formulario_id: str, user_id: int, personaje: str | None = None) -> bool:
+    data = cargar_datos()
+    formulario = data["formularios"].get(str(formulario_id))
+    if formulario is None or formulario["estado"] != "abierto":
+        return False
+    antes = len(formulario["respuestas"])
+    formulario["respuestas"] = [
+        r for r in formulario["respuestas"]
+        if not (
+            r["user_id"] == user_id
+            and (personaje is None or r.get("personaje", "").casefold() == personaje.casefold())
+        )
+    ]
+    guardar_datos(data)
+    return len(formulario["respuestas"]) < antes
