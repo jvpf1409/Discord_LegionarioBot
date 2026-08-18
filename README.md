@@ -190,3 +190,18 @@ Los oficiales pueden publicar una encuesta persistente para conocer el interés 
 - `/form pvp cerrar formulario_id:<id>`: cierra el formulario y desactiva sus botones.
 
 Los comandos requieren el rol `Legionario Oficial`. Los participantes usan **Inscribir personaje** y pueden retirar uno de sus personajes mientras el formulario siga abierto. Las estadísticas muestran el nombre visible de Discord junto a cada personaje inscrito.
+# Bienvenida y registro automático
+
+Al entrar una persona, el bot publica una tarjeta con su avatar y un botón de
+registro. El cuestionario asigna `Invitado`, `Legionario` o `Raid` según sus
+respuestas.
+
+1. Instala las dependencias con `pip install -r requirements.txt`.
+2. Copia tu fondo a `assets/welcome_background.png` (idealmente 900×500 o mayor).
+3. Configura en `.env`: `CANAL_BIENVENIDA_ID`, `ROL_INVITADO_ID`,
+   `ROL_LEGIONARIO_ID`, `ROL_RAID_ID`, `WELCOME_BACKGROUND` y
+   `WELCOME_SERVER_NAME`.
+4. En Discord Developer Portal, activa **Server Members Intent**.
+5. Dale al bot los permisos **Ver canal**, **Enviar mensajes**, **Adjuntar
+   archivos** y **Gestionar roles**. En la jerarquía, coloca el rol del bot por
+   encima de Invitado, Legionario y Raid.

@@ -17,6 +17,7 @@ from utils.iconos import cargar_iconos
 from cogs.vistas import EventoView
 from cogs.vistas_raid import RaidView
 from cogs.pvp import PvpView
+from cogs.bienvenida import RegistroInicialView
 
 load_dotenv()
 
@@ -26,6 +27,7 @@ GUILD_ID = os.getenv("GUILD_ID")  # opcional: sincroniza más rápido solo en un
 logging.basicConfig(level=logging.INFO)
 
 intents = discord.Intents.default()
+intents.members = True
 # No se necesita message_content porque todo funciona con comandos slash y componentes.
 
 bot = commands.Bot(command_prefix="!wow ", intents=intents)
@@ -69,6 +71,9 @@ async def main():
         await bot.load_extension("cogs.raids")
         await bot.load_extension("cogs.recordatorios")
         await bot.load_extension("cogs.pvp")
+        await bot.load_extension("cogs.bienvenida")
+        # El botón de registro sigue funcionando después de reiniciar el bot.
+        bot.add_view(RegistroInicialView())
         await bot.start(TOKEN)
 
 
