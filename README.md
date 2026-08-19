@@ -208,7 +208,9 @@ Solo los roles controladores pueden publicar o pulsar el botón. Al activarlo,
 el bot aplica silencio de servidor a los miembros con un rol afectado, salvo que
 tengan un rol exento o el rol límite (o uno superior). Quienes entren después
 reciben la misma regla. Al desactivar o abandonar la sala, el bot desmutea solo
-a quienes había silenciado el propio control.
+a quienes había silenciado el propio control. Antes de activar el silencio, el
+bot consulta los roles actuales directamente a Discord, por lo que no es necesario
+reiniciarlo después de asignar o retirar un rol.
 
 El bot necesita **Silenciar miembros**, **Ver canal** y **Enviar mensajes**. Su
 rol debe estar por encima de todos los roles afectados. El estado activo se

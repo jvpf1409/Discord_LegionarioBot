@@ -124,6 +124,14 @@ class ControlVoz(commands.Cog):
         except (discord.Forbidden, discord.HTTPException):
             return False, True
 
+    @staticmethod
+    async def _obtener_miembro_actualizado(miembro: discord.Member) -> discord.Member:
+        """Consulta los roles actuales sin depender de la cache de miembros."""
+        try:
+            return await miembro.guild.fetch_member(miembro.id)
+        except (discord.Forbidden, discord.HTTPException, discord.NotFound):
+            return miembro
+
     async def alternar(self, canal_id: int) -> tuple[bool, int, int]:
         lock = self.locks.setdefault(canal_id, asyncio.Lock())
         async with lock:
@@ -133,7 +141,10 @@ class ControlVoz(commands.Cog):
             activar = canal_id not in self.canales_activos
             if activar:
                 self.canales_activos.add(canal_id)
-                resultados = [await self._silenciar(miembro, canal_id) for miembro in canal.members]
+                resultados = []
+                for miembro in canal.members:
+                    miembro_actualizado = await self._obtener_miembro_actualizado(miembro)
+                    resultados.append(await self._silenciar(miembro_actualizado, canal_id))
             else:
                 self.canales_activos.discard(canal_id)
                 ids = set(self.silenciados_por_bot.get(canal_id, set()))
