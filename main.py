@@ -69,6 +69,7 @@ async def main():
         await bot.load_extension("cogs.raids")
         await bot.load_extension("cogs.recordatorios")
         await bot.load_extension("cogs.pvp")
+        await bot.load_extension("cogs.control_voz")
         await bot.start(TOKEN)
 
 
