@@ -192,16 +192,20 @@ Los oficiales pueden publicar una encuesta persistente para conocer el interés 
 Los comandos requieren el rol `Legionario Oficial`. Los participantes usan **Inscribir personaje** y pueden retirar uno de sus personajes mientras el formulario siga abierto. Las estadísticas muestran el nombre visible de Discord junto a cada personaje inscrito.
 # Bienvenida y registro automático
 
-Al entrar una persona, el bot publica una tarjeta con su avatar y un botón de
-registro. El cuestionario asigna `Invitado`, `Legionario` o `Raid` según sus
-respuestas.
+Al entrar una persona, el bot publica una tarjeta con su avatar en el canal de
+bienvenida. El registro se inicia desde un panel permanente en otro canal y
+asigna `Invitado`, `Legionario` o `Raid` según las respuestas.
+Las normas se muestran en páginas efímeras privadas y el botón del formulario
+solo aparece después de llegar a la última página.
 
 1. Instala las dependencias con `pip install -r requirements.txt`.
 2. Copia tu fondo a `assets/welcome_background.png` (idealmente 900×500 o mayor).
-3. Configura en `.env`: `CANAL_BIENVENIDA_ID`, `ROL_INVITADO_ID`,
-   `ROL_LEGIONARIO_ID`, `ROL_RAID_ID`, `WELCOME_BACKGROUND` y
-   `WELCOME_SERVER_NAME`.
+3. Configura en `.env`: `CANAL_BIENVENIDA_ID`, `CANAL_REGISTRO_ID`,
+   `ROL_INVITADO_ID`, `ROL_LEGIONARIO_ID`, `ROL_RAID_ID`,
+   `WELCOME_BACKGROUND`, `WELCOME_SERVER_NAME` y `NORMAS_REGISTRO_PATH`.
 4. En Discord Developer Portal, activa **Server Members Intent**.
 5. Dale al bot los permisos **Ver canal**, **Enviar mensajes**, **Adjuntar
    archivos** y **Gestionar roles**. En la jerarquía, coloca el rol del bot por
    encima de Invitado, Legionario y Raid.
+6. Edita `assets/normas_registro.txt`, reinicia el bot y ejecuta una vez
+   `/publicar_registro` para crear el panel permanente.
