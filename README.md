@@ -190,7 +190,7 @@ Los oficiales pueden publicar una encuesta persistente para conocer el interés 
 - `/form pvp cerrar formulario_id:<id>`: cierra el formulario y desactiva sus botones.
 
 Los comandos requieren el rol `Legionario Oficial`. Los participantes usan **Inscribir personaje** y pueden retirar uno de sus personajes mientras el formulario siga abierto. Las estadísticas muestran el nombre visible de Discord junto a cada personaje inscrito.
-# Bienvenida y registro automático
+## Bienvenida y registro automático
 
 Al entrar una persona, el bot publica una tarjeta con su avatar en el canal de
 bienvenida. El registro se inicia desde un panel permanente en otro canal y
@@ -209,3 +209,28 @@ solo aparece después de llegar a la última página.
    encima de Invitado, Legionario y Raid.
 6. Edita `assets/normas_registro.txt`, reinicia el bot y ejecuta una vez
    `/publicar_registro` para crear el panel permanente.
+
+## Control de silencio por canal de voz
+
+El comando `/voz panel` publica un botón para el canal de voz elegido. Configura
+primero estos valores en `.env` (se pueden separar varios IDs con comas):
+
+```env
+VOZ_CANALES_ID=id_canal_raid_1,id_canal_raid_2
+VOZ_ROLES_CONTROLADORES_ID=id_rol_raid_leader
+VOZ_ROLES_AFECTADOS_ID=id_rol_legionario
+VOZ_ROLES_EXENTOS_ID=id_rol_exento_opcional
+VOZ_ROL_LIMITE_ID=id_primer_rol_superior_exento
+```
+
+Solo los roles controladores pueden publicar o pulsar el botón. Al activarlo,
+el bot aplica silencio de servidor a los miembros con un rol afectado, salvo que
+tengan un rol exento o el rol límite (o uno superior). Quienes entren después
+reciben la misma regla. Al desactivar o abandonar la sala, el bot desmutea solo
+a quienes había silenciado el propio control. Antes de activar el silencio, el
+bot consulta los roles actuales directamente a Discord, por lo que no es necesario
+reiniciarlo después de asignar o retirar un rol.
+
+El bot necesita **Silenciar miembros**, **Ver canal** y **Enviar mensajes**. Su
+rol debe estar por encima de todos los roles afectados. El estado activo se
+reinicia por seguridad cuando se reinicia el bot.

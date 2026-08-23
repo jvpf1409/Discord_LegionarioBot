@@ -74,6 +74,7 @@ async def main():
         await bot.load_extension("cogs.bienvenida")
         # El botón de registro sigue funcionando después de reiniciar el bot.
         bot.add_view(RegistroInicialView())
+        await bot.load_extension("cogs.control_voz")
         await bot.start(TOKEN)
 
 
