@@ -131,38 +131,19 @@ async def crear_tarjeta(member: discord.Member) -> discord.File:
     return discord.File(output, filename="bienvenida.png")
 
 
-async def _responder_registro(
-    interaction: discord.Interaction,
-    contenido: str,
-    *,
-    editar_mensaje: bool,
-) -> None:
-    if editar_mensaje:
-        await interaction.response.edit_message(content=contenido, embed=None, view=None)
-    else:
-        await interaction.response.send_message(contenido, ephemeral=True)
-
-
 async def _asignar_rol(
     interaction: discord.Interaction,
     role_id: int,
     label: str,
-    *,
-    editar_mensaje: bool = False,
 ) -> None:
     if not interaction.guild or not isinstance(interaction.user, discord.Member):
-        await _responder_registro(
-            interaction,
-            "Este registro solo funciona dentro del servidor.",
-            editar_mensaje=editar_mensaje,
-        )
+        await interaction.response.send_message("Este registro solo funciona dentro del servidor.", ephemeral=True)
         return
     role = interaction.guild.get_role(role_id)
     if role is None:
-        await _responder_registro(
-            interaction,
+        await interaction.response.send_message(
             f"No pude encontrar el rol **{label}**. Avísale a un administrador.",
-            editar_mensaje=editar_mensaje,
+            ephemeral=True,
         )
         return
     configured = [interaction.guild.get_role(rid) for rid in (ROL_INVITADO_ID, ROL_LEGIONARIO_ID, ROL_RAID_ID)]
@@ -172,16 +153,14 @@ async def _asignar_rol(
             await interaction.user.remove_roles(*roles_to_remove, reason="Actualización de registro")
         await interaction.user.add_roles(role, reason="Formulario de bienvenida")
     except discord.Forbidden:
-        await _responder_registro(
-            interaction,
+        await interaction.response.send_message(
             "No pude asignar el rol. El rol del bot debe estar por encima de los roles de registro.",
-            editar_mensaje=editar_mensaje,
+            ephemeral=True,
         )
         return
-    await _responder_registro(
-        interaction,
+    await interaction.response.send_message(
         f"Registro completado. Se te asignó el rol **{role.name}**.",
-        editar_mensaje=editar_mensaje,
+        ephemeral=True,
     )
 
 
@@ -307,69 +286,6 @@ class RegistroModal(discord.ui.Modal, title="Formulario de registro"):
             await _asignar_rol(interaction, ROL_INVITADO_ID, "Invitado")
 
 
-class FormularioPaginadoView(discord.ui.View):
-    def __init__(self, usuario_id: int) -> None:
-        super().__init__(timeout=600)
-        self.usuario_id = usuario_id
-        self.pregunta = 1
-
-    def crear_embed(self) -> discord.Embed:
-        preguntas = {
-            1: (
-                "¿Juegas World of Warcraft?",
-                "Si respondes No, se te asignará el rol Invitado y el formulario terminará.",
-            ),
-            2: (
-                "¿Eres parte de Legionarios de la Furia?",
-                "Debes tener al menos un personaje dentro de la hermandad.",
-            ),
-            3: (
-                "¿Participarás en las raids?",
-                "Si vienes principalmente para participar en raids, responde Sí.",
-            ),
-        }
-        titulo, descripcion = preguntas[self.pregunta]
-        embed = discord.Embed(
-            title=f"Formulario · Pregunta {self.pregunta} de 3",
-            description=f"**{titulo}**\n\n{descripcion}",
-            color=discord.Color.dark_red(),
-        )
-        return embed
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id == self.usuario_id:
-            return True
-        await interaction.response.send_message("Este formulario pertenece a otra persona.", ephemeral=True)
-        return False
-
-    async def _avanzar(self, interaction: discord.Interaction, pregunta: int) -> None:
-        self.pregunta = pregunta
-        await interaction.response.edit_message(embed=self.crear_embed(), view=self)
-
-    @discord.ui.button(label="Sí", style=discord.ButtonStyle.success, emoji="✅")
-    async def si(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        if self.pregunta == 1:
-            await self._avanzar(interaction, 2)
-        elif self.pregunta == 2:
-            await _asignar_rol(
-                interaction,
-                ROL_LEGIONARIO_ID,
-                "Legionario",
-                editar_mensaje=True,
-            )
-        else:
-            await _asignar_rol(interaction, ROL_RAID_ID, "Raid", editar_mensaje=True)
-
-    @discord.ui.button(label="No", style=discord.ButtonStyle.danger, emoji="❌")
-    async def no(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        if self.pregunta == 1:
-            await _asignar_rol(interaction, ROL_INVITADO_ID, "Invitado", editar_mensaje=True)
-        elif self.pregunta == 2:
-            await self._avanzar(interaction, 3)
-        else:
-            await _asignar_rol(interaction, ROL_INVITADO_ID, "Invitado", editar_mensaje=True)
-
-
 class Bienvenida(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -402,29 +318,6 @@ class Bienvenida(commands.Cog):
         await interaction.followup.send(
             content="Vista previa de la bienvenida:",
             file=card,
-            ephemeral=True,
-        )
-
-    @app_commands.command(
-        name="form1",
-        description="Prueba el formulario modal con las tres preguntas simultáneas.",
-    )
-    @app_commands.guild_only()
-    @app_commands.default_permissions(administrator=True)
-    async def form1(self, interaction: discord.Interaction) -> None:
-        await interaction.response.send_modal(RegistroModal())
-
-    @app_commands.command(
-        name="form2",
-        description="Prueba el formulario paginado con preguntas condicionales.",
-    )
-    @app_commands.guild_only()
-    @app_commands.default_permissions(administrator=True)
-    async def form2(self, interaction: discord.Interaction) -> None:
-        view = FormularioPaginadoView(interaction.user.id)
-        await interaction.response.send_message(
-            embed=view.crear_embed(),
-            view=view,
             ephemeral=True,
         )
 
