@@ -72,6 +72,7 @@ async def main():
         await bot.load_extension("cogs.recordatorios")
         await bot.load_extension("cogs.pvp")
         await bot.load_extension("cogs.bienvenida")
+        await bot.load_extension("cogs.mensajes")
         # El botón de registro sigue funcionando después de reiniciar el bot.
         bot.add_view(RegistroInicialView())
         await bot.load_extension("cogs.control_voz")
