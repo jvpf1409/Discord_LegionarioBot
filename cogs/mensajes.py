@@ -42,13 +42,15 @@ class MensajeModal(discord.ui.Modal, title="Publicar mensaje"):
         style=discord.TextStyle.paragraph,
         placeholder="Escribe aquí el mensaje que publicará el bot...",
         min_length=1,
-        max_length=4000,
+        max_length=2000,
         required=True,
     )
 
-    def __init__(self, canal: discord.abc.Messageable):
-        super().__init__()
+    def __init__(self, canal: discord.abc.Messageable, *, usar_embed: bool):
+        super().__init__(title="Publicar anuncio" if usar_embed else "Publicar mensaje")
         self.canal = canal
+        self.usar_embed = usar_embed
+        self.contenido.max_length = 4000 if usar_embed else 2000
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -56,7 +58,8 @@ class MensajeModal(discord.ui.Modal, title="Publicar mensaje"):
             self.contenido.value.strip(), interaction.guild
         )
 
-        if len(mensaje) > 4096:
+        limite = 4096 if self.usar_embed else 2000
+        if len(mensaje) > limite:
             await interaction.followup.send(
                 "❌ El mensaje es demasiado largo. Acórtalo un poco.", ephemeral=True
             )
@@ -74,13 +77,19 @@ class MensajeModal(discord.ui.Modal, title="Publicar mensaje"):
             return
 
         try:
-            embed = discord.Embed(
-                description=mensaje,
-                color=discord.Color.blurple(),
-            )
-            menciones = " ".join(rol.mention for rol in roles) or None
+            embed = None
+            contenido = mensaje
+            if self.usar_embed:
+                embed = discord.Embed(
+                    description=mensaje,
+                    color=discord.Color.blurple(),
+                )
+                # Las menciones dentro de un embed no notifican, por eso se
+                # incluyen también como contenido normal sobre el anuncio.
+                contenido = " ".join(rol.mention for rol in roles) or None
+
             publicado = await self.canal.send(
-                content=menciones,
+                content=contenido,
                 embed=embed,
                 allowed_mentions=discord.AllowedMentions(
                     everyone=False,
@@ -125,6 +134,20 @@ class Mensajes(commands.Cog):
     @app_commands.guild_only()
     @es_organizador()
     async def mensaje(self, interaction: discord.Interaction):
+        await self._abrir_modal(interaction, usar_embed=False)
+
+    @app_commands.command(
+        name="anuncio",
+        description="Publica un anuncio embebido como el bot en este canal",
+    )
+    @app_commands.guild_only()
+    @es_organizador()
+    async def anuncio(self, interaction: discord.Interaction):
+        await self._abrir_modal(interaction, usar_embed=True)
+
+    async def _abrir_modal(
+        self, interaction: discord.Interaction, *, usar_embed: bool
+    ):
         canal = interaction.channel
         if canal is None or not hasattr(canal, "send") or not hasattr(canal, "permissions_for"):
             await interaction.response.send_message(
@@ -133,24 +156,40 @@ class Mensajes(commands.Cog):
             return
 
         permisos = canal.permissions_for(interaction.guild.me)
-        if not permisos.view_channel or not permisos.send_messages or not permisos.embed_links:
+        if not permisos.view_channel or not permisos.send_messages:
             await interaction.response.send_message(
-                "❌ Necesito permisos para ver el canal, enviar mensajes e insertar enlaces.",
+                "❌ No tengo permiso para publicar en este canal.", ephemeral=True
+            )
+            return
+        if usar_embed and not permisos.embed_links:
+            await interaction.response.send_message(
+                "❌ Necesito el permiso **Insertar enlaces** para publicar anuncios embebidos.",
                 ephemeral=True,
             )
             return
 
-        await interaction.response.send_modal(MensajeModal(canal))
+        await interaction.response.send_modal(MensajeModal(canal, usar_embed=usar_embed))
 
     @mensaje.error
-    async def on_permission_error(
+    async def on_mensaje_error(
+        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+    ):
+        await self._responder_error(interaction, error)
+
+    @anuncio.error
+    async def on_anuncio_error(
+        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+    ):
+        await self._responder_error(interaction, error)
+
+    async def _responder_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
     ):
         if isinstance(error, app_commands.MissingRole):
             aviso = f"🚫 Necesitas el rol **{ROL_OFICIAL}** para usar este comando."
         else:
             original = getattr(error, "original", error)
-            logger.exception("Error inesperado en /mensaje", exc_info=original)
+            logger.exception("Error inesperado al preparar una publicación", exc_info=original)
             aviso = "⚠️ Ocurrió un error inesperado al preparar el mensaje."
 
         if interaction.response.is_done():

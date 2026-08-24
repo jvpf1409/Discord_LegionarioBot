@@ -92,7 +92,8 @@ constante `ROL_OFICIAL`).
 | `/evento listar [estado]` | Lista eventos del servidor (abiertos/cerrados/finalizados) |
 | `/evento cancelar evento_id` | Cancela el evento por completo |
 | `/raid duplicar raid_id fecha hora` | Duplica una raid conservando sus datos y canales, pero con una fecha y hora nuevas |
-| `/mensaje` | Abre un formulario y publica un embed como el bot en el canal actual; admite saltos de línea y menciones `@Nombre del rol` |
+| `/mensaje` | Publica un mensaje de texto normal como el bot en el canal actual; admite saltos de línea y menciones `@Nombre del rol` |
+| `/anuncio` | Publica un mensaje embebido como el bot en el canal actual; admite saltos de línea y menciones `@Nombre del rol` |
 
 ### Tipos de inscripción
 
