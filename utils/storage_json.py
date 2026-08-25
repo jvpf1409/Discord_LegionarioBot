@@ -235,6 +235,17 @@ def actualizar_raid(raid_id: str, **cambios):
     return data["raids"][raid_id]
 
 
+def eliminar_raid(raid_id: str) -> bool:
+    """Borra una raid por completo. Devuelve True si existía."""
+    data = cargar_datos()
+    raid_id = str(raid_id)
+    if raid_id not in data["raids"]:
+        return False
+    del data["raids"][raid_id]
+    guardar_datos(data)
+    return True
+
+
 def inscribir_en_raid(raid_id: str, inscrito: dict) -> tuple[bool, str]:
     """Registra la inscripción; si el usuario ya estaba inscrito, actualiza su clase/spec."""
     data = cargar_datos()

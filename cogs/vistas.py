@@ -29,6 +29,9 @@ def construir_embed_evento(evento: dict) -> discord.Embed:
     if ts:
         embed.add_field(name="📅 Fecha y hora", value=f"<t:{ts}:F> (<t:{ts}:R>)", inline=True)
 
+    if evento.get("creado_por"):
+        embed.add_field(name="Creado por", value=f"<@{evento['creado_por']}>", inline=True)
+
     es_grupal = evento["tipo_inscripcion"] == "grupal"
 
     if es_grupal:

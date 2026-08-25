@@ -36,6 +36,8 @@ def construir_embed_raid(raid: dict) -> discord.Embed:
     }[raid["estado"]]
     embed.add_field(name="Inscripciones", value=estado_txt, inline=True)
     embed.add_field(name="Inscritos", value=str(len(raid["inscritos"])), inline=True)
+    if raid.get("creado_por"):
+        embed.add_field(name="Creada por", value=f"<@{raid['creado_por']}>", inline=True)
 
     conteos = {"tank": 0, "healer": 0, "melee": 0, "ranged": 0}
     for i in raid["inscritos"]:

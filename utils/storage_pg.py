@@ -297,6 +297,15 @@ def actualizar_raid(raid_id: str, **cambios):
     return obtener_raid(raid_id)
 
 
+def eliminar_raid(raid_id: str) -> bool:
+    """Borra una raid por completo. Devuelve True si existía."""
+    with _conectar() as conn:
+        resultado = conn.execute(
+            "DELETE FROM raids WHERE id = %s", (int(raid_id),)
+        )
+    return resultado.rowcount > 0
+
+
 def inscribir_en_raid(raid_id: str, inscrito: dict) -> tuple[bool, str]:
     """Registra la inscripción; si el usuario ya estaba inscrito, actualiza su clase/spec."""
     with _conectar() as conn:

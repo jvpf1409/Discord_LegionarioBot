@@ -88,6 +88,69 @@ class DescripcionRaidModal(discord.ui.Modal, title="Descripción de la raid"):
         )
 
 
+class ConfirmarEliminarRaidView(discord.ui.View):
+    """Confirmación antes de borrar una raid de forma permanente."""
+
+    def __init__(self, raid_id: str, titulo: str, autor_id: int):
+        super().__init__(timeout=60)
+        self.raid_id = raid_id
+        self.titulo = titulo
+        self.autor_id = autor_id
+        self.message: discord.Message | None = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.autor_id:
+            await interaction.response.send_message(
+                "❌ Solo quien ejecutó el comando puede confirmar esto.", ephemeral=True
+            )
+            return False
+        return True
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        if self.message is not None:
+            try:
+                await self.message.edit(
+                    content="⌛ Se acabó el tiempo, la raid no fue eliminada.", view=self
+                )
+            except discord.HTTPException:
+                pass
+
+    @discord.ui.button(
+        label="Sí, eliminar permanentemente",
+        style=discord.ButtonStyle.danger,
+        emoji="🗑️",
+    )
+    async def confirmar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        raid = storage.obtener_raid(self.raid_id)
+        if raid is not None:
+            try:
+                canal = interaction.client.get_channel(raid["canal_id"])
+                mensaje = await canal.fetch_message(raid["mensaje_id"])
+                await mensaje.delete()
+            except Exception:
+                pass
+            storage.eliminar_raid(self.raid_id)
+
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(
+            content=f"🗑️ Raid **{self.titulo}** (ID: {self.raid_id}) eliminada permanentemente.",
+            view=self,
+        )
+        self.stop()
+
+    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary, emoji="✖️")
+    async def rechazar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(
+            content="Operación cancelada — la raid **no** fue eliminada.", view=self
+        )
+        self.stop()
+
+
 class Raids(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -279,6 +342,36 @@ class Raids(commands.Cog):
             pass
         await interaction.response.send_message(f"🗑️ Raid **{raid['titulo']}** cancelada.")
 
+    # ---------------------- ELIMINAR ----------------------
+    @raid_group.command(
+        name="eliminar",
+        description="Elimina una raid de forma PERMANENTE (solo administradores)",
+    )
+    @app_commands.describe(raid_id="ID de la raid a eliminar")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
+    async def eliminar(self, interaction: discord.Interaction, raid_id: str):
+        if not raid_id.isdecimal():
+            await interaction.response.send_message("❌ El ID de la raid no es válido.", ephemeral=True)
+            return
+
+        raid = storage.obtener_raid(raid_id)
+        if raid is None or raid.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message(
+                "❌ No existe esa raid en este servidor.", ephemeral=True
+            )
+            return
+
+        view = ConfirmarEliminarRaidView(raid_id, raid["titulo"], interaction.user.id)
+        await interaction.response.send_message(
+            f"⚠️ **¿Seguro que quieres eliminar la raid #{raid_id} — {raid['titulo']}?**\n"
+            "Esta acción es **permanente**: borra el mensaje de la raid y todos sus datos "
+            "incluidas las inscripciones.",
+            view=view,
+            ephemeral=True,
+        )
+        view.message = await interaction.original_response()
+
     # ---------------------- LISTAR ----------------------
     @raid_group.command(name="listar", description="Lista las raids del servidor")
     @app_commands.describe(estado="Filtra por estado (opcional)")
@@ -298,6 +391,10 @@ class Raids(commands.Cog):
             resumen = f"Inscritos: {len(r['inscritos'])}"
             if r.get("fecha_hora_ts"):
                 resumen += f"\n📅 <t:{r['fecha_hora_ts']}:f>"
+            if r.get("creado_por"):
+                resumen += f"\n👤 Creada por: <@{r['creado_por']}>"
+            else:
+                resumen += "\n👤 Creada por: No registrado"
             embed.add_field(name=f"#{r['id']} — {r['titulo']} ({r['estado']})", value=resumen, inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -306,9 +403,12 @@ class Raids(commands.Cog):
     @duplicar.error
     @cerrar.error
     @cancelar.error
+    @eliminar.error
     async def on_permission_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingRole):
             mensaje = f"🚫 Necesitas el rol **{ROL_OFICIAL}** para usar este comando."
+        elif isinstance(error, app_commands.MissingPermissions):
+            mensaje = "🚫 Necesitas permisos de administrador para usar este comando."
         else:
             original = getattr(error, "original", error)
             logger.exception("Error inesperado en un comando de /raid", exc_info=original)
