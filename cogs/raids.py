@@ -12,7 +12,7 @@ from discord.ext import commands
 from utils import storage
 from utils.anuncios import anunciar_publicacion
 from utils.permisos import ROL_OFICIAL, es_organizador
-from utils.tiempo import parse_fecha_hora
+from utils.tiempo import fecha_hora_desde_timestamp, parse_fecha_hora
 from cogs.vistas_raid import RaidView, construir_embed_raid
 
 logger = logging.getLogger(__name__)
@@ -342,6 +342,120 @@ class Raids(commands.Cog):
             pass
         await interaction.response.send_message(f"🗑️ Raid **{raid['titulo']}** cancelada.")
 
+    # ---------------------- EDITAR ----------------------
+    @raid_group.command(
+        name="editar",
+        description="Edita una raid existente sin perder sus inscritos (solo administradores)",
+    )
+    @app_commands.describe(
+        raid_id="ID de la raid a editar",
+        titulo="Nuevo título (opcional)",
+        descripcion="Nueva descripción (opcional)",
+        fecha="Nueva fecha DD/MM/AAAA; conserva la actual si se omite",
+        hora="Nueva hora HH:MM; conserva la actual si se omite",
+        imagen="Nueva imagen (opcional)",
+        quitar_imagen="Quita la imagen actual de la raid",
+    )
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
+    async def editar(
+        self,
+        interaction: discord.Interaction,
+        raid_id: str,
+        titulo: str = None,
+        descripcion: str = None,
+        fecha: str = None,
+        hora: str = None,
+        imagen: discord.Attachment = None,
+        quitar_imagen: bool = False,
+    ):
+        if not raid_id.isdecimal():
+            await interaction.response.send_message("❌ El ID de la raid no es válido.", ephemeral=True)
+            return
+
+        raid = storage.obtener_raid(raid_id)
+        if raid is None or raid.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message(
+                "❌ No existe esa raid en este servidor.", ephemeral=True
+            )
+            return
+
+        if imagen is not None and quitar_imagen:
+            await interaction.response.send_message(
+                "❌ No puedes subir una imagen y quitarla al mismo tiempo.", ephemeral=True
+            )
+            return
+        if imagen is not None and not (imagen.content_type or "").startswith("image/"):
+            await interaction.response.send_message(
+                "❌ El archivo adjunto debe ser una imagen.", ephemeral=True
+            )
+            return
+
+        cambios = {}
+        if titulo is not None:
+            titulo = titulo.strip()
+            if not titulo:
+                await interaction.response.send_message(
+                    "❌ El título no puede quedar vacío.", ephemeral=True
+                )
+                return
+            cambios["titulo"] = titulo
+        if descripcion is not None:
+            descripcion = descripcion.strip()
+            if not descripcion:
+                await interaction.response.send_message(
+                    "❌ La descripción no puede quedar vacía.", ephemeral=True
+                )
+                return
+            cambios["descripcion"] = descripcion
+
+        if fecha is not None or hora is not None:
+            fecha_actual, hora_actual = fecha_hora_desde_timestamp(raid["fecha_hora_ts"])
+            try:
+                cambios["fecha_hora_ts"] = parse_fecha_hora(
+                    fecha or fecha_actual, hora or hora_actual
+                )
+            except ValueError:
+                await interaction.response.send_message(
+                    "❌ Fecha u hora inválidas. Usa `DD/MM/AAAA` y `HH:MM` (24h).",
+                    ephemeral=True,
+                )
+                return
+            cambios["recordatorio_enviado"] = False
+
+        if imagen is not None:
+            cambios["imagen_url"] = imagen.url
+        elif quitar_imagen:
+            cambios["imagen_url"] = None
+
+        if not cambios:
+            await interaction.response.send_message(
+                "⚠️ Indica al menos un dato para modificar.", ephemeral=True
+            )
+            return
+
+        raid = storage.actualizar_raid(raid_id, **cambios)
+        aviso = ""
+        try:
+            canal = self.bot.get_channel(raid["canal_id"])
+            if canal is None:
+                canal = await self.bot.fetch_channel(raid["canal_id"])
+            mensaje = await canal.fetch_message(raid["mensaje_id"])
+            if raid["estado"] == "abierto":
+                view = RaidView(raid_id, abierta=True)
+            elif raid["estado"] == "cerrado":
+                view = RaidView(raid_id, abierta=False)
+            else:
+                view = None
+            await mensaje.edit(embed=construir_embed_raid(raid), view=view)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException, AttributeError):
+            aviso = "\n⚠️ Los datos se guardaron, pero no pude actualizar el mensaje publicado."
+
+        await interaction.response.send_message(
+            f"✅ Raid **{raid['titulo']}** (ID: {raid_id}) actualizada sin perder inscritos.{aviso}",
+            ephemeral=True,
+        )
+
     # ---------------------- ELIMINAR ----------------------
     @raid_group.command(
         name="eliminar",
@@ -403,6 +517,7 @@ class Raids(commands.Cog):
     @duplicar.error
     @cerrar.error
     @cancelar.error
+    @editar.error
     @eliminar.error
     async def on_permission_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingRole):

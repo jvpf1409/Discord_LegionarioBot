@@ -24,3 +24,14 @@ def parse_fecha_hora(fecha: str, hora: str) -> int:
     dt_naive = datetime.strptime(f"{fecha.strip()} {hora.strip()}", "%d/%m/%Y %H:%M")
     dt = dt_naive.replace(tzinfo=zona)
     return int(dt.timestamp())
+
+
+def fecha_hora_desde_timestamp(timestamp: int) -> tuple[str, str]:
+    """Convierte un timestamp a fecha y hora locales en los formatos del bot."""
+    try:
+        zona = ZoneInfo(ZONA_HORARIA)
+    except ZoneInfoNotFoundError:
+        zona = ZoneInfo("UTC")
+
+    dt = datetime.fromtimestamp(timestamp, tz=zona)
+    return dt.strftime("%d/%m/%Y"), dt.strftime("%H:%M")
