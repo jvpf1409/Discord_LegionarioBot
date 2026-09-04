@@ -58,6 +58,16 @@ def obtener_lista_asistencia(lista_id: str, guild_id: int) -> dict | None:
     return lista if lista and lista["guild_id"] == guild_id else None
 
 
+def actualizar_lista_asistencia(lista_id: str, guild_id: int, **cambios) -> dict | None:
+    data = cargar_datos()
+    lista = data["listas_asistencia"].get(str(lista_id))
+    if lista is None or lista["guild_id"] != guild_id:
+        return None
+    lista.update(cambios)
+    guardar_datos(data)
+    return lista
+
+
 def listar_listas_asistencia(guild_id: int, limite: int = 10) -> list[dict]:
     listas = [lista for lista in cargar_datos()["listas_asistencia"].values()
               if lista["guild_id"] == guild_id]

@@ -108,6 +108,30 @@ def obtener_lista_asistencia(lista_id: str, guild_id: int) -> dict | None:
     return _fila_a_lista_asistencia(fila) if fila else None
 
 
+def actualizar_lista_asistencia(lista_id: str, guild_id: int, **cambios) -> dict | None:
+    try:
+        identificador = int(lista_id)
+    except (TypeError, ValueError):
+        return None
+    with _conectar() as conn:
+        with conn.transaction():
+            fila = conn.execute(
+                "SELECT data FROM listas_asistencia WHERE id = %s AND guild_id = %s FOR UPDATE",
+                (identificador, guild_id),
+            ).fetchone()
+            if fila is None:
+                return None
+            data = dict(fila["data"])
+            data.update(cambios)
+            conn.execute(
+                """UPDATE listas_asistencia
+                   SET data = %s, fecha_hora_ts = %s
+                   WHERE id = %s AND guild_id = %s""",
+                (Json(data), data["fecha_hora_ts"], identificador, guild_id),
+            )
+    return obtener_lista_asistencia(lista_id, guild_id)
+
+
 def listar_listas_asistencia(guild_id: int, limite: int = 10) -> list[dict]:
     with _conectar() as conn:
         filas = conn.execute(
