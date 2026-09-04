@@ -57,9 +57,64 @@ def _asegurar_tabla():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS listas_asistencia (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                fecha_hora_ts BIGINT NOT NULL,
+                data JSONB NOT NULL
+            )
+            """
+        )
 
 
 _asegurar_tabla()
+
+
+def _fila_a_lista_asistencia(fila) -> dict:
+    lista = dict(fila["data"])
+    lista["id"] = str(fila["id"])
+    return lista
+
+
+def crear_lista_asistencia(guild_id: int, canal_voz_id: int, canal_voz_nombre: str,
+                           canal_publicacion_id: int, creado_por: int,
+                           fecha_hora_ts: int, miembros: list[dict]) -> str:
+    data = {
+        "guild_id": guild_id, "canal_voz_id": canal_voz_id,
+        "canal_voz_nombre": canal_voz_nombre,
+        "canal_publicacion_id": canal_publicacion_id, "creado_por": creado_por,
+        "fecha_hora_ts": fecha_hora_ts, "miembros": miembros,
+    }
+    with _conectar() as conn:
+        fila = conn.execute(
+            "INSERT INTO listas_asistencia (guild_id, fecha_hora_ts, data) VALUES (%s, %s, %s) RETURNING id",
+            (guild_id, fecha_hora_ts, Json(data)),
+        ).fetchone()
+    return str(fila["id"])
+
+
+def obtener_lista_asistencia(lista_id: str, guild_id: int) -> dict | None:
+    try:
+        identificador = int(lista_id)
+    except (TypeError, ValueError):
+        return None
+    with _conectar() as conn:
+        fila = conn.execute(
+            "SELECT id, data FROM listas_asistencia WHERE id = %s AND guild_id = %s",
+            (identificador, guild_id),
+        ).fetchone()
+    return _fila_a_lista_asistencia(fila) if fila else None
+
+
+def listar_listas_asistencia(guild_id: int, limite: int = 10) -> list[dict]:
+    with _conectar() as conn:
+        filas = conn.execute(
+            "SELECT id, data FROM listas_asistencia WHERE guild_id = %s ORDER BY fecha_hora_ts DESC, id DESC LIMIT %s",
+            (guild_id, limite),
+        ).fetchall()
+    return [_fila_a_lista_asistencia(fila) for fila in filas]
 
 
 def _fila_a_evento(fila) -> dict:

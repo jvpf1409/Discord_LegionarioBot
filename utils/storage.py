@@ -29,6 +29,7 @@ if os.getenv("DATABASE_URL"):
         quitar_de_raid,
         crear_formulario_pvp, obtener_formulario, listar_todos_los_formularios,
         actualizar_formulario, responder_formulario, quitar_respuesta_formulario,
+        crear_lista_asistencia, obtener_lista_asistencia, listar_listas_asistencia,
     )
 else:
     from utils.storage_json import (
@@ -52,4 +53,5 @@ else:
         quitar_de_raid,
         crear_formulario_pvp, obtener_formulario, listar_todos_los_formularios,
         actualizar_formulario, responder_formulario, quitar_respuesta_formulario,
+        crear_lista_asistencia, obtener_lista_asistencia, listar_listas_asistencia,
     )

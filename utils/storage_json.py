@@ -17,7 +17,8 @@ def _asegurar_archivo():
         with open(DATA_PATH, "w", encoding="utf-8") as f:
             json.dump(
                 {"next_id": 1, "eventos": {}, "next_raid_id": 1, "raids": {},
-                 "next_formulario_id": 1, "formularios": {}},
+                 "next_formulario_id": 1, "formularios": {},
+                 "next_lista_asistencia_id": 1, "listas_asistencia": {}},
                 f, ensure_ascii=False, indent=2,
             )
 
@@ -31,7 +32,38 @@ def cargar_datos() -> dict:
     data.setdefault("next_raid_id", 1)
     data.setdefault("formularios", {})
     data.setdefault("next_formulario_id", 1)
+    data.setdefault("listas_asistencia", {})
+    data.setdefault("next_lista_asistencia_id", 1)
     return data
+
+
+def crear_lista_asistencia(guild_id: int, canal_voz_id: int, canal_voz_nombre: str,
+                           canal_publicacion_id: int, creado_por: int,
+                           fecha_hora_ts: int, miembros: list[dict]) -> str:
+    data = cargar_datos()
+    lista_id = str(data["next_lista_asistencia_id"])
+    data["next_lista_asistencia_id"] += 1
+    data["listas_asistencia"][lista_id] = {
+        "id": lista_id, "guild_id": guild_id, "canal_voz_id": canal_voz_id,
+        "canal_voz_nombre": canal_voz_nombre,
+        "canal_publicacion_id": canal_publicacion_id, "creado_por": creado_por,
+        "fecha_hora_ts": fecha_hora_ts, "miembros": miembros,
+    }
+    guardar_datos(data)
+    return lista_id
+
+
+def obtener_lista_asistencia(lista_id: str, guild_id: int) -> dict | None:
+    lista = cargar_datos()["listas_asistencia"].get(str(lista_id))
+    return lista if lista and lista["guild_id"] == guild_id else None
+
+
+def listar_listas_asistencia(guild_id: int, limite: int = 10) -> list[dict]:
+    listas = [lista for lista in cargar_datos()["listas_asistencia"].values()
+              if lista["guild_id"] == guild_id]
+    return sorted(listas,
+                  key=lambda lista: (lista["fecha_hora_ts"], int(lista["id"])),
+                  reverse=True)[:limite]
 
 
 def guardar_datos(data: dict):
