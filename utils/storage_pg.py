@@ -59,6 +59,15 @@ def _asegurar_tabla():
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS raids_programadas (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                data JSONB NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS listas_asistencia (
                 id SERIAL PRIMARY KEY,
                 guild_id BIGINT NOT NULL,
@@ -416,6 +425,68 @@ def quitar_de_raid(raid_id: str, user_id: int) -> bool:
             data["inscritos"] = [i for i in data["inscritos"] if i["user_id"] != user_id]
             conn.execute("UPDATE raids SET data = %s WHERE id = %s", (Json(data), int(raid_id)))
     return len(data["inscritos"]) < antes
+
+
+def _fila_a_raid_programada(fila) -> dict:
+    item = dict(fila["data"])
+    item["id"] = str(fila["id"])
+    return item
+
+
+def crear_raid_programada(**campos) -> str:
+    data = {"activa": True, **campos}
+    with _conectar() as conn:
+        fila = conn.execute(
+            "INSERT INTO raids_programadas (guild_id, data) VALUES (%s, %s) RETURNING id",
+            (data["guild_id"], Json(data)),
+        ).fetchone()
+    return str(fila["id"])
+
+
+def obtener_raid_programada(programacion_id: str) -> dict | None:
+    with _conectar() as conn:
+        fila = conn.execute(
+            "SELECT id, data FROM raids_programadas WHERE id = %s", (int(programacion_id),)
+        ).fetchone()
+    return _fila_a_raid_programada(fila) if fila else None
+
+
+def listar_raids_programadas(guild_id: int | None = None) -> list[dict]:
+    with _conectar() as conn:
+        if guild_id is None:
+            filas = conn.execute("SELECT id, data FROM raids_programadas ORDER BY id").fetchall()
+        else:
+            filas = conn.execute(
+                "SELECT id, data FROM raids_programadas WHERE guild_id = %s ORDER BY id",
+                (guild_id,),
+            ).fetchall()
+    return [_fila_a_raid_programada(fila) for fila in filas]
+
+
+def actualizar_raid_programada(programacion_id: str, **cambios) -> dict | None:
+    with _conectar() as conn:
+        with conn.transaction():
+            fila = conn.execute(
+                "SELECT data FROM raids_programadas WHERE id = %s FOR UPDATE",
+                (int(programacion_id),),
+            ).fetchone()
+            if fila is None:
+                return None
+            data = dict(fila["data"])
+            data.update(cambios)
+            conn.execute(
+                "UPDATE raids_programadas SET data = %s WHERE id = %s",
+                (Json(data), int(programacion_id)),
+            )
+    return obtener_raid_programada(programacion_id)
+
+
+def eliminar_raid_programada(programacion_id: str) -> bool:
+    with _conectar() as conn:
+        resultado = conn.execute(
+            "DELETE FROM raids_programadas WHERE id = %s", (int(programacion_id),)
+        )
+    return resultado.rowcount > 0
 
 
 # Formularios PvP

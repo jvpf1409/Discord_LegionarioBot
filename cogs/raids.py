@@ -4,6 +4,7 @@ crear, cerrar, cancelar, listar.
 """
 
 import logging
+import time
 
 import discord
 from discord import app_commands
@@ -12,10 +13,19 @@ from discord.ext import commands
 from utils import storage
 from utils.anuncios import anunciar_publicacion
 from utils.permisos import ROL_OFICIAL, es_organizador
-from utils.tiempo import fecha_hora_desde_timestamp, parse_fecha_hora
+from utils.tiempo import (
+    fecha_hora_desde_timestamp,
+    dia_semana_hora_desde_timestamp,
+    parse_fecha_hora,
+    siguiente_ocurrencia_semanal,
+)
+from cogs.vistas import EventoView, construir_embed_evento
 from cogs.vistas_raid import RaidView, construir_embed_raid
 
 logger = logging.getLogger(__name__)
+
+DIAS_SEMANA = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+
 
 class DescripcionRaidModal(discord.ui.Modal, title="Descripción de la raid"):
     """
@@ -203,6 +213,177 @@ class Raids(commands.Cog):
             creado_por=interaction.user.id,
         )
         await interaction.response.send_modal(modal)
+
+    # ---------------------- PROGRAMACIONES SEMANALES ----------------------
+    @raid_group.command(
+        name="programar", description="Programa la publicación semanal automática de una raid"
+    )
+    @app_commands.describe(
+        raid_id="ID de la raid que se usará como plantilla semanal",
+        dia_publicacion="Día semanal en que se publicarán las inscripciones",
+        hora_publicacion="Hora de publicación en formato HH:MM",
+    )
+    @app_commands.choices(dia_publicacion=[
+        app_commands.Choice(name=nombre.capitalize(), value=indice)
+        for indice, nombre in enumerate(DIAS_SEMANA)
+    ])
+    @es_organizador()
+    async def programar(
+        self,
+        interaction: discord.Interaction,
+        raid_id: str,
+        dia_publicacion: app_commands.Choice[int],
+        hora_publicacion: str,
+    ):
+        raid = storage.obtener_raid(raid_id) if raid_id.isdecimal() else None
+        if raid is None or raid.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message(
+                "❌ No existe esa raid en este servidor.", ephemeral=True
+            )
+            return
+        if not raid.get("fecha_hora_ts"):
+            await interaction.response.send_message(
+                "❌ La raid no tiene una fecha y hora válidas.", ephemeral=True
+            )
+            return
+        try:
+            siguiente_publicacion = siguiente_ocurrencia_semanal(
+                dia_publicacion.value, hora_publicacion, int(time.time())
+            )
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Hora inválida. Usa el formato `HH:MM` (24h).", ephemeral=True
+            )
+            return
+        dia_raid, hora_raid = dia_semana_hora_desde_timestamp(raid["fecha_hora_ts"])
+        siguiente_raid = siguiente_ocurrencia_semanal(
+            dia_raid, hora_raid, raid["fecha_hora_ts"] + 60
+        )
+        programacion_id = storage.crear_raid_programada(
+            raid_plantilla_id=raid_id,
+            guild_id=interaction.guild_id,
+            dia_raid=dia_raid,
+            hora_raid=hora_raid,
+            dia_publicacion=dia_publicacion.value,
+            hora_publicacion=hora_publicacion.strip(),
+            siguiente_publicacion_ts=siguiente_publicacion,
+            siguiente_raid_ts=siguiente_raid,
+            creado_por=interaction.user.id,
+        )
+        await interaction.response.send_message(
+            f"✅ Programación #{programacion_id} creada usando la raid #{raid_id} como plantilla.\n"
+            f"Próxima publicación: <t:{siguiente_publicacion}:F>\n"
+            f"Raid que publicará: <t:{siguiente_raid}:F>",
+            ephemeral=True,
+        )
+
+    @raid_group.command(name="programaciones", description="Lista las raids semanales programadas")
+    async def programaciones(self, interaction: discord.Interaction):
+        items = storage.listar_raids_programadas(interaction.guild_id)
+        if not items:
+            await interaction.response.send_message(
+                "No hay raids programadas en este servidor.", ephemeral=True
+            )
+            return
+        lineas = []
+        for item in items:
+            estado = "activa" if item.get("activa", True) else "pausada"
+            if "raid_plantilla_id" not in item:
+                lineas.append(f"**#{item['id']} — programación antigua incompatible** · pausada")
+                continue
+            plantilla = storage.obtener_raid(item["raid_plantilla_id"])
+            titulo = plantilla["titulo"] if plantilla else "Plantilla eliminada"
+            lineas.append(
+                f"**#{item['id']} — {titulo}** (plantilla #{item['raid_plantilla_id']}) · {estado}\n"
+                f"Publica: {DIAS_SEMANA[item['dia_publicacion']]} {item['hora_publicacion']} "
+                f"(<t:{item['siguiente_publicacion_ts']}:R>) · "
+                f"Raid: {DIAS_SEMANA[item['dia_raid']]} {item['hora_raid']}"
+            )
+        await interaction.response.send_message("\n\n".join(lineas), ephemeral=True)
+
+    @raid_group.command(
+        name="editar_programacion", description="Edita una programación semanal de raid"
+    )
+    @app_commands.describe(
+        programacion_id="ID mostrado por /raid programaciones",
+        hora_publicacion="Nueva hora semanal de publicación en formato HH:MM",
+    )
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
+    async def editar_programacion(
+        self, interaction: discord.Interaction, programacion_id: str,
+        hora_publicacion: str,
+    ):
+        item = storage.obtener_raid_programada(programacion_id) if programacion_id.isdecimal() else None
+        if item is None or item.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message(
+                "❌ No existe esa programación en este servidor.", ephemeral=True
+            )
+            return
+        if "raid_plantilla_id" not in item:
+            await interaction.response.send_message(
+                "❌ Esta programación usa el formato antiguo. Elimínala y vuelve a crearla.",
+                ephemeral=True,
+            )
+            return
+        try:
+            siguiente = siguiente_ocurrencia_semanal(
+                item["dia_publicacion"], hora_publicacion, int(time.time())
+            )
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Hora inválida. Usa `HH:MM` (24h).", ephemeral=True
+            )
+            return
+        storage.actualizar_raid_programada(
+            programacion_id,
+            hora_publicacion=hora_publicacion.strip(),
+            siguiente_publicacion_ts=siguiente,
+        )
+        await interaction.response.send_message(
+            f"✅ Programación #{programacion_id} actualizada. Próxima publicación: <t:{siguiente}:F>.",
+            ephemeral=True,
+        )
+
+    @raid_group.command(name="activar_programacion", description="Activa o pausa una programación")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
+    async def activar_programacion(
+        self, interaction: discord.Interaction, programacion_id: str, activa: bool
+    ):
+        item = storage.obtener_raid_programada(programacion_id) if programacion_id.isdecimal() else None
+        if item is None or item.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message("❌ No existe esa programación.", ephemeral=True)
+            return
+        cambios = {"activa": activa}
+        if activa:
+            if "raid_plantilla_id" not in item:
+                await interaction.response.send_message(
+                    "❌ Esta programación usa el formato antiguo. Elimínala y créala nuevamente.",
+                    ephemeral=True,
+                )
+                return
+            cambios["siguiente_publicacion_ts"] = siguiente_ocurrencia_semanal(
+                item["dia_publicacion"], item["hora_publicacion"], int(time.time())
+            )
+        storage.actualizar_raid_programada(programacion_id, **cambios)
+        await interaction.response.send_message(
+            f"✅ Programación #{programacion_id} {'activada' if activa else 'pausada'}.", ephemeral=True
+        )
+
+    @raid_group.command(name="eliminar_programacion", description="Elimina una programación semanal")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
+    async def eliminar_programacion(self, interaction: discord.Interaction, programacion_id: str):
+        item = storage.obtener_raid_programada(programacion_id) if programacion_id.isdecimal() else None
+        if item is None or item.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message("❌ No existe esa programación.", ephemeral=True)
+            return
+        storage.eliminar_raid_programada(programacion_id)
+        await interaction.response.send_message(
+            f"🗑️ Programación #{programacion_id} eliminada. Las raids ya publicadas se conservan.",
+            ephemeral=True,
+        )
 
     # ---------------------- DUPLICAR ----------------------
     @raid_group.command(
@@ -456,6 +637,115 @@ class Raids(commands.Cog):
             ephemeral=True,
         )
 
+    # ---------------------- CONVERTIR A EVENTO ----------------------
+    @raid_group.command(
+        name="convertir_a_evento",
+        description="Convierte una raid en un evento individual (solo administradores)",
+    )
+    @app_commands.describe(raid_id="ID de la raid que quieres convertir")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
+    async def convertir_a_evento(self, interaction: discord.Interaction, raid_id: str):
+        if not raid_id.isdecimal():
+            await interaction.response.send_message(
+                "❌ El ID de la raid no es válido.", ephemeral=True
+            )
+            return
+
+        raid = storage.obtener_raid(raid_id)
+        if raid is None or raid.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message(
+                "❌ No existe esa raid en este servidor.", ephemeral=True
+            )
+            return
+
+        if raid["estado"] not in ("abierto", "cerrado"):
+            await interaction.response.send_message(
+                "❌ Solo se pueden convertir raids abiertas o cerradas.", ephemeral=True
+            )
+            return
+
+        if not raid.get("mensaje_id"):
+            await interaction.response.send_message(
+                "❌ La raid no tiene un mensaje publicado que se pueda convertir.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        canal = self.bot.get_channel(raid["canal_id"])
+        if canal is None:
+            try:
+                canal = await self.bot.fetch_channel(raid["canal_id"])
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                canal = None
+
+        if not isinstance(canal, discord.abc.Messageable):
+            await interaction.followup.send(
+                "❌ No pude encontrar el canal donde está publicada la raid.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            mensaje = await canal.fetch_message(raid["mensaje_id"])
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException, AttributeError):
+            await interaction.followup.send(
+                "❌ No pude encontrar o editar el mensaje publicado de la raid.",
+                ephemeral=True,
+            )
+            return
+
+        evento_id = storage.crear_evento(
+            titulo=raid["titulo"],
+            descripcion=raid["descripcion"],
+            guild_id=raid["guild_id"],
+            canal_id=raid["canal_id"],
+            creado_por=raid.get("creado_por") or interaction.user.id,
+            fecha_hora_ts=raid["fecha_hora_ts"],
+            tipo_inscripcion="individual",
+            canal_inscripciones_id=raid.get("canal_inscripciones_id"),
+            imagen_url=raid.get("imagen_url"),
+        )
+
+        participantes = [
+            {
+                "user_id": inscrito["user_id"],
+                "nombre_discord": inscrito.get("nombre_discord", "Usuario"),
+                "clase": inscrito.get("clase"),
+                "especializacion": inscrito.get("especializacion"),
+                "rol": inscrito.get("rol"),
+            }
+            for inscrito in raid.get("inscritos", [])
+        ]
+        evento = storage.actualizar_evento(
+            evento_id,
+            mensaje_id=raid["mensaje_id"],
+            estado=raid["estado"],
+            participantes=participantes,
+            recordatorio_enviado=raid.get("recordatorio_enviado", False),
+        )
+
+        view = EventoView(evento_id, abierto=evento["estado"] == "abierto")
+        try:
+            await mensaje.edit(embed=construir_embed_evento(evento), view=view)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            storage.eliminar_evento(evento_id)
+            await interaction.followup.send(
+                "❌ No pude actualizar el mensaje. La raid quedó intacta y no se realizó la conversión.",
+                ephemeral=True,
+            )
+            return
+
+        storage.eliminar_raid(raid_id)
+        await interaction.followup.send(
+            f"✅ Raid **{raid['titulo']}** convertida en evento individual "
+            f"(nuevo ID de evento: {evento_id}). Se conservaron "
+            f"{len(participantes)} inscritos y el mismo mensaje.",
+            ephemeral=True,
+        )
+
     # ---------------------- ELIMINAR ----------------------
     @raid_group.command(
         name="eliminar",
@@ -514,10 +804,15 @@ class Raids(commands.Cog):
 
     # Manejo de errores de permisos para todo el grupo
     @crear.error
+    @programar.error
+    @editar_programacion.error
+    @activar_programacion.error
+    @eliminar_programacion.error
     @duplicar.error
     @cerrar.error
     @cancelar.error
     @editar.error
+    @convertir_a_evento.error
     @eliminar.error
     async def on_permission_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingRole):

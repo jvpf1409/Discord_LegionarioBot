@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 
 from utils import storage
 from utils.iconos import cargar_iconos
+from utils.log_comandos import formatear_invocacion
 from cogs.vistas import EventoView
 from cogs.vistas_raid import RaidView
 from cogs.pvp import PvpView
@@ -25,12 +26,20 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = os.getenv("GUILD_ID")  # opcional: sincroniza más rápido solo en un servidor de pruebas
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 intents = discord.Intents.default()
 intents.members = True
 # No se necesita message_content porque todo funciona con comandos slash y componentes.
 
 bot = commands.Bot(command_prefix="!wow ", intents=intents)
+
+
+@bot.event
+async def on_interaction(interaction: discord.Interaction):
+    """Registra cada intento de ejecutar un comando slash antes de procesarlo."""
+    if interaction.type is discord.InteractionType.application_command:
+        logger.info(formatear_invocacion(interaction))
 
 
 @bot.event
@@ -70,6 +79,7 @@ async def main():
         await bot.load_extension("cogs.eventos")
         await bot.load_extension("cogs.raids")
         await bot.load_extension("cogs.recordatorios")
+        await bot.load_extension("cogs.automatizacion")
         await bot.load_extension("cogs.pvp")
         await bot.load_extension("cogs.bienvenida")
         await bot.load_extension("cogs.mensajes")

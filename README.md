@@ -63,6 +63,14 @@ Si configuras `CANAL_AVISOS_ID`, al crear un evento o raid el bot publicará
 automáticamente un aviso con el enlace directo a la publicación. Si además
 configuras `ROL_AVISOS_ID`, mencionará ese rol (por ejemplo, Legionarios).
 El mismo canal y rol reciben un único recordatorio 30 minutos antes del inicio.
+Las inscripciones que continúen abiertas se cierran automáticamente 3 horas
+después de la fecha de cada evento o raid. Las programaciones semanales usan
+`ZONA_HORARIA`; cada raid publicada automáticamente puede modificarse después
+con `/raid editar`, igual que una raid creada manualmente.
+
+Cada intento de ejecutar un comando slash queda registrado en la salida del bot
+con el usuario, sus identificadores de usuario/servidor/canal, el comando completo
+y sus parámetros. Los valores extensos se recortan para mantener los logs legibles.
 
 > `GUILD_ID` hace que los comandos slash aparezcan al instante en ese servidor.
 > Si lo dejas vacío, la sincronización global puede tardar hasta ~1 hora la primera vez.
@@ -93,6 +101,12 @@ constante `ROL_OFICIAL`).
 | `/evento cancelar evento_id` | Cancela el evento por completo |
 | `/raid duplicar raid_id fecha hora` | Duplica una raid conservando sus datos y canales, pero con una fecha y hora nuevas |
 | `/raid editar raid_id [titulo] [descripcion] [fecha] [hora] [imagen] [quitar_imagen]` | Edita una raid sin perder inscritos (solo administradores) |
+| `/raid programar raid_id dia_publicacion hora_publicacion` | Usa una raid existente como plantilla y publica una copia nueva cada semana |
+| `/raid programaciones` | Lista las programaciones y sus próximas fechas |
+| `/raid editar_programacion programacion_id hora_publicacion` | Cambia la hora semanal de publicación |
+| `/raid activar_programacion programacion_id activa` | Activa o pausa una programación semanal |
+| `/raid eliminar_programacion programacion_id` | Elimina una programación sin borrar las raids ya publicadas |
+| `/raid convertir_a_evento raid_id` | Convierte una raid abierta o cerrada en un evento individual, conservando inscritos y mensaje (solo administradores) |
 | `/raid eliminar raid_id` | Elimina permanentemente una raid y su mensaje (solo administradores) |
 | `/mensaje` | Publica un mensaje de texto normal como el bot en el canal actual; admite saltos de línea y menciones `@Nombre del rol` |
 | `/anuncio` | Publica un mensaje embebido como el bot en el canal actual; admite saltos de línea y menciones `@Nombre del rol` |

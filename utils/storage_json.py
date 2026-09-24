@@ -17,6 +17,7 @@ def _asegurar_archivo():
         with open(DATA_PATH, "w", encoding="utf-8") as f:
             json.dump(
                 {"next_id": 1, "eventos": {}, "next_raid_id": 1, "raids": {},
+                 "next_raid_programada_id": 1, "raids_programadas": {},
                  "next_formulario_id": 1, "formularios": {},
                  "next_lista_asistencia_id": 1, "listas_asistencia": {}},
                 f, ensure_ascii=False, indent=2,
@@ -30,6 +31,8 @@ def cargar_datos() -> dict:
             data = json.load(f)
     data.setdefault("raids", {})
     data.setdefault("next_raid_id", 1)
+    data.setdefault("raids_programadas", {})
+    data.setdefault("next_raid_programada_id", 1)
     data.setdefault("formularios", {})
     data.setdefault("next_formulario_id", 1)
     data.setdefault("listas_asistencia", {})
@@ -313,6 +316,47 @@ def quitar_de_raid(raid_id: str, user_id: int) -> bool:
     raid["inscritos"] = [i for i in raid["inscritos"] if i["user_id"] != user_id]
     guardar_datos(data)
     return len(raid["inscritos"]) < antes
+
+
+def crear_raid_programada(**campos) -> str:
+    data = cargar_datos()
+    programacion_id = str(data["next_raid_programada_id"])
+    data["next_raid_programada_id"] += 1
+    data["raids_programadas"][programacion_id] = {
+        "id": programacion_id, "activa": True, **campos,
+    }
+    guardar_datos(data)
+    return programacion_id
+
+
+def obtener_raid_programada(programacion_id: str) -> dict | None:
+    return cargar_datos()["raids_programadas"].get(str(programacion_id))
+
+
+def listar_raids_programadas(guild_id: int | None = None) -> list[dict]:
+    items = cargar_datos()["raids_programadas"].values()
+    if guild_id is not None:
+        items = [item for item in items if item["guild_id"] == guild_id]
+    return sorted(items, key=lambda item: int(item["id"]))
+
+
+def actualizar_raid_programada(programacion_id: str, **cambios) -> dict | None:
+    data = cargar_datos()
+    item = data["raids_programadas"].get(str(programacion_id))
+    if item is None:
+        return None
+    item.update(cambios)
+    guardar_datos(data)
+    return item
+
+
+def eliminar_raid_programada(programacion_id: str) -> bool:
+    data = cargar_datos()
+    item = data["raids_programadas"].pop(str(programacion_id), None)
+    if item is None:
+        return False
+    guardar_datos(data)
+    return True
 
 
 # Formularios PvP
