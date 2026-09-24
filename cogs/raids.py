@@ -12,7 +12,7 @@ from discord.ext import commands
 
 from utils import storage
 from utils.anuncios import anunciar_publicacion
-from utils.permisos import ROL_OFICIAL, es_organizador
+from utils.permisos import es_administrador, es_organizador, mensaje_error_permiso
 from utils.tiempo import (
     fecha_hora_desde_timestamp,
     dia_semana_hora_desde_timestamp,
@@ -308,8 +308,7 @@ class Raids(commands.Cog):
         programacion_id="ID mostrado por /raid programaciones",
         hora_publicacion="Nueva hora semanal de publicación en formato HH:MM",
     )
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.checks.has_permissions(administrator=True)
+    @es_administrador()
     async def editar_programacion(
         self, interaction: discord.Interaction, programacion_id: str,
         hora_publicacion: str,
@@ -346,8 +345,7 @@ class Raids(commands.Cog):
         )
 
     @raid_group.command(name="activar_programacion", description="Activa o pausa una programación")
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.checks.has_permissions(administrator=True)
+    @es_administrador()
     async def activar_programacion(
         self, interaction: discord.Interaction, programacion_id: str, activa: bool
     ):
@@ -372,8 +370,7 @@ class Raids(commands.Cog):
         )
 
     @raid_group.command(name="eliminar_programacion", description="Elimina una programación semanal")
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.checks.has_permissions(administrator=True)
+    @es_administrador()
     async def eliminar_programacion(self, interaction: discord.Interaction, programacion_id: str):
         item = storage.obtener_raid_programada(programacion_id) if programacion_id.isdecimal() else None
         if item is None or item.get("guild_id") != interaction.guild_id:
@@ -537,8 +534,7 @@ class Raids(commands.Cog):
         imagen="Nueva imagen (opcional)",
         quitar_imagen="Quita la imagen actual de la raid",
     )
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.checks.has_permissions(administrator=True)
+    @es_administrador()
     async def editar(
         self,
         interaction: discord.Interaction,
@@ -643,8 +639,7 @@ class Raids(commands.Cog):
         description="Convierte una raid en un evento individual (solo administradores)",
     )
     @app_commands.describe(raid_id="ID de la raid que quieres convertir")
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.checks.has_permissions(administrator=True)
+    @es_administrador()
     async def convertir_a_evento(self, interaction: discord.Interaction, raid_id: str):
         if not raid_id.isdecimal():
             await interaction.response.send_message(
@@ -752,8 +747,7 @@ class Raids(commands.Cog):
         description="Elimina una raid de forma PERMANENTE (solo administradores)",
     )
     @app_commands.describe(raid_id="ID de la raid a eliminar")
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.checks.has_permissions(administrator=True)
+    @es_administrador()
     async def eliminar(self, interaction: discord.Interaction, raid_id: str):
         if not raid_id.isdecimal():
             await interaction.response.send_message("❌ El ID de la raid no es válido.", ephemeral=True)
@@ -815,11 +809,8 @@ class Raids(commands.Cog):
     @convertir_a_evento.error
     @eliminar.error
     async def on_permission_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.MissingRole):
-            mensaje = f"🚫 Necesitas el rol **{ROL_OFICIAL}** para usar este comando."
-        elif isinstance(error, app_commands.MissingPermissions):
-            mensaje = "🚫 Necesitas permisos de administrador para usar este comando."
-        else:
+        mensaje = mensaje_error_permiso(error)
+        if mensaje is None:
             original = getattr(error, "original", error)
             logger.exception("Error inesperado en un comando de /raid", exc_info=original)
             mensaje = f"⚠️ Ocurrió un error: {original}"

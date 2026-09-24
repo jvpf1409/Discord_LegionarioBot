@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.permisos import ROL_OFICIAL, es_organizador
+from utils.permisos import es_organizador, mensaje_error_permiso
 
 
 logger = logging.getLogger(__name__)
@@ -185,9 +185,8 @@ class Mensajes(commands.Cog):
     async def _responder_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
     ):
-        if isinstance(error, app_commands.MissingRole):
-            aviso = f"🚫 Necesitas el rol **{ROL_OFICIAL}** para usar este comando."
-        else:
+        aviso = mensaje_error_permiso(error)
+        if aviso is None:
             original = getattr(error, "original", error)
             logger.exception("Error inesperado al preparar una publicación", exc_info=original)
             aviso = "⚠️ Ocurrió un error inesperado al preparar el mensaje."

@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import storage
-from utils.permisos import ROL_OFICIAL, es_organizador
+from utils.permisos import es_organizador, mensaje_error_permiso
 from utils.wow_data import CLASES, icono_clase, icono_especializacion, rol_de
 
 logger = logging.getLogger(__name__)
@@ -432,8 +432,8 @@ class Formularios(commands.Cog):
     @inscritos.error
     @cerrar.error
     async def error_permisos(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        mensaje = f"🚫 Necesitas el rol **{ROL_OFICIAL}** para usar este comando."
-        if not isinstance(error, app_commands.MissingRole):
+        mensaje = mensaje_error_permiso(error)
+        if mensaje is None:
             logger.exception("Error en un comando PvP", exc_info=getattr(error, "original", error))
             mensaje = "⚠️ Ocurrió un error al ejecutar el comando."
         if interaction.response.is_done():

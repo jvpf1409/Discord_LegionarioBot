@@ -11,7 +11,7 @@ from discord.ext import commands
 
 from utils import storage
 from utils.anuncios import anunciar_publicacion
-from utils.permisos import ROL_OFICIAL, es_organizador
+from utils.permisos import es_organizador, mensaje_error_permiso
 from utils.tiempo import parse_fecha_hora
 from cogs.vistas import EventoView, construir_embed_evento
 
@@ -412,9 +412,8 @@ class Eventos(commands.Cog):
     @cancelar.error
     @eliminar.error
     async def on_permission_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.MissingRole):
-            mensaje = f"🚫 Necesitas el rol **{ROL_OFICIAL}** para usar este comando."
-        else:
+        mensaje = mensaje_error_permiso(error)
+        if mensaje is None:
             # CommandInvokeError envuelve la excepción real en .original; la mostramos
             # y la registramos completa para poder diagnosticarla en los logs de Render.
             original = getattr(error, "original", error)

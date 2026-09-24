@@ -13,6 +13,8 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+from utils.permisos import es_administrador, mensaje_error_permiso
+
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
@@ -295,7 +297,7 @@ class Bienvenida(commands.Cog):
         description="Genera una vista previa privada de la bienvenida.",
     )
     @app_commands.guild_only()
-    @app_commands.default_permissions(administrator=True)
+    @es_administrador()
     async def probar_bienvenida(self, interaction: discord.Interaction) -> None:
         if not isinstance(interaction.user, discord.Member):
             await interaction.response.send_message(
@@ -326,7 +328,7 @@ class Bienvenida(commands.Cog):
         description="Publica el panel permanente de registro en el canal configurado.",
     )
     @app_commands.guild_only()
-    @app_commands.default_permissions(administrator=True)
+    @es_administrador()
     async def publicar_registro(self, interaction: discord.Interaction) -> None:
         if not interaction.guild or not CANAL_REGISTRO_ID:
             await interaction.response.send_message(
@@ -365,6 +367,17 @@ class Bienvenida(commands.Cog):
             f"Panel publicado correctamente: {message.jump_url}",
             ephemeral=True,
         )
+
+    async def cog_app_command_error(
+        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+    ) -> None:
+        mensaje = mensaje_error_permiso(error)
+        if mensaje is None:
+            raise error
+        if interaction.response.is_done():
+            await interaction.followup.send(mensaje, ephemeral=True)
+        else:
+            await interaction.response.send_message(mensaje, ephemeral=True)
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:

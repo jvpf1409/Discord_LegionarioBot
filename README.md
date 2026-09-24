@@ -55,6 +55,8 @@ cp .env.example .env
 ```
 DISCORD_TOKEN=tu_token_aqui
 GUILD_ID=tu_id_de_servidor   # opcional, recomendado durante pruebas
+ROL_MAESTRO_ID=id_del_rol_legionario_maestro
+ROL_OFICIAL_ID=id_del_rol_legionario_oficial
 CANAL_AVISOS_ID=id_del_canal_general       # opcional
 ROL_AVISOS_ID=id_del_rol_legionarios       # opcional
 ```
@@ -88,9 +90,10 @@ Si todo va bien verás algo como:
 
 ## 6. Comandos disponibles
 
-Todos son comandos slash bajo el grupo `/evento`. Los que crean o modifican eventos
-requieren el rol **Legionario Oficial** (puedes cambiar esto en `cogs/eventos.py`,
-constante `ROL_OFICIAL`).
+Los permisos se dividen en tres niveles: **Legionario Maestro**, **Legionario
+Oficial** y **Público**. Maestro hereda los comandos de Oficial. Los dos roles se
+identifican por los IDs configurados en `.env`, por lo que pueden renombrarse en
+Discord sin romper los permisos.
 
 | Comando | Descripción |
 |---|---|
@@ -185,9 +188,8 @@ implementan las mismas funciones, así que el resto del código no distingue cu�
 
 ## 8. Personalización rápida
 
-- **Cambiar el rol requerido para administrar eventos:** edita la constante
-  `ROL_OFICIAL` en `utils/permisos.py` (debe coincidir exactamente con el nombre del
-  rol en Discord, mayúsculas incluidas).
+- **Cambiar los roles de acceso:** configura `ROL_MAESTRO_ID` y `ROL_OFICIAL_ID`
+  en `.env` con los IDs copiados desde Discord. No es necesario modificar código.
 - **Modificar la composición de equipos grupales:** ajusta los campos de
   `EquipoRosterModal` en `cogs/vistas.py`.
 

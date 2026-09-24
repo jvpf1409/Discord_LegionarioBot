@@ -9,6 +9,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.permisos import es_administrador, mensaje_error_permiso
+
 
 def _ids_env(nombre: str) -> set[int]:
     resultado: set[int] = set()
@@ -166,11 +168,8 @@ class ControlVoz(commands.Cog):
 
     @voz.command(name="panel", description="Publica el boton de silencio para un canal configurado")
     @app_commands.describe(canal="Canal de voz que controlara este boton")
+    @es_administrador()
     async def publicar_panel(self, interaction: discord.Interaction, canal: discord.VoiceChannel) -> None:
-        miembro = interaction.user
-        if not isinstance(miembro, discord.Member) or not self.puede_controlar(miembro):
-            await interaction.response.send_message("No tienes permiso para publicar este panel.", ephemeral=True)
-            return
         if canal.id not in CANALES_PERMITIDOS:
             await interaction.response.send_message("Ese canal no esta incluido en VOZ_CANALES_ID.", ephemeral=True)
             return
@@ -181,6 +180,17 @@ class ControlVoz(commands.Cog):
             color=discord.Color.blurple(),
         )
         await interaction.response.send_message(embed=embed, view=PanelSilencio(self, canal.id))
+
+    async def cog_app_command_error(
+        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+    ) -> None:
+        mensaje = mensaje_error_permiso(error)
+        if mensaje is None:
+            raise error
+        if interaction.response.is_done():
+            await interaction.followup.send(mensaje, ephemeral=True)
+        else:
+            await interaction.response.send_message(mensaje, ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import storage
-from utils.permisos import ROL_OFICIAL, es_organizador
+from utils.permisos import es_organizador, mensaje_error_permiso
 
 
 logger = logging.getLogger(__name__)
@@ -159,9 +159,8 @@ class Asistencia(commands.Cog):
     async def cog_app_command_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
     ) -> None:
-        if isinstance(error, app_commands.MissingRole):
-            aviso = f"🚫 Necesitas el rol **{ROL_OFICIAL}** para usar este comando."
-        else:
+        aviso = mensaje_error_permiso(error)
+        if aviso is None:
             original = getattr(error, "original", error)
             logger.exception("Error en un comando de asistencia", exc_info=original)
             aviso = "⚠️ No pude procesar la lista de asistencia. Inténtalo nuevamente."
