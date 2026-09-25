@@ -11,8 +11,8 @@ from discord.ext import commands
 
 from utils import storage
 from utils.anuncios import anunciar_publicacion
-from utils.permisos import es_organizador, mensaje_error_permiso
-from utils.tiempo import parse_fecha_hora
+from utils.permisos import es_administrador, es_organizador, mensaje_error_permiso
+from utils.tiempo import fecha_hora_desde_timestamp, parse_fecha_hora
 from cogs.vistas import EventoView, construir_embed_evento
 
 logger = logging.getLogger(__name__)
@@ -244,6 +244,114 @@ class Eventos(commands.Cog):
             f"🔒 Inscripciones cerradas para **{evento['titulo']}** ({resumen}).",
         )
 
+    # ---------------------- EDITAR ----------------------
+    @evento_group.command(
+        name="editar",
+        description="Edita un evento sin perder sus inscripciones (solo Maestro)",
+    )
+    @app_commands.describe(
+        evento_id="ID del evento que quieres editar",
+        titulo="Nuevo título (opcional)",
+        descripcion="Nueva descripción (opcional)",
+        fecha="Nueva fecha DD/MM/AAAA; conserva la actual si se omite",
+        hora="Nueva hora HH:MM; conserva la actual si se omite",
+        imagen="Nueva imagen (opcional)",
+        quitar_imagen="Quita la imagen actual del evento",
+    )
+    @es_administrador()
+    async def editar(
+        self,
+        interaction: discord.Interaction,
+        evento_id: str,
+        titulo: str = None,
+        descripcion: str = None,
+        fecha: str = None,
+        hora: str = None,
+        imagen: discord.Attachment = None,
+        quitar_imagen: bool = False,
+    ):
+        evento = storage.obtener_evento(evento_id) if evento_id.isdecimal() else None
+        if evento is None or evento.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message(
+                "❌ No existe ese evento en este servidor.", ephemeral=True
+            )
+            return
+        if imagen is not None and quitar_imagen:
+            await interaction.response.send_message(
+                "❌ No puedes subir una imagen y quitarla al mismo tiempo.", ephemeral=True
+            )
+            return
+        if imagen is not None and not (imagen.content_type or "").startswith("image/"):
+            await interaction.response.send_message(
+                "❌ El archivo adjunto debe ser una imagen.", ephemeral=True
+            )
+            return
+
+        cambios = {}
+        for campo, valor in (("titulo", titulo), ("descripcion", descripcion)):
+            if valor is not None:
+                valor = valor.strip()
+                if not valor:
+                    await interaction.response.send_message(
+                        f"❌ {campo.capitalize()} no puede quedar vacío.", ephemeral=True
+                    )
+                    return
+                cambios[campo] = valor
+
+        if fecha is not None or hora is not None:
+            if not evento.get("fecha_hora_ts"):
+                if fecha is None or hora is None:
+                    await interaction.response.send_message(
+                        "❌ El evento no tiene una fecha anterior válida; indica fecha y hora.",
+                        ephemeral=True,
+                    )
+                    return
+                fecha_actual, hora_actual = fecha, hora
+            else:
+                fecha_actual, hora_actual = fecha_hora_desde_timestamp(
+                    evento["fecha_hora_ts"]
+                )
+            try:
+                cambios["fecha_hora_ts"] = parse_fecha_hora(
+                    fecha or fecha_actual, hora or hora_actual
+                )
+            except ValueError:
+                await interaction.response.send_message(
+                    "❌ Fecha u hora inválidas. Usa `DD/MM/AAAA` y `HH:MM` (24h).",
+                    ephemeral=True,
+                )
+                return
+            cambios["recordatorio_enviado"] = False
+
+        if imagen is not None:
+            cambios["imagen_url"] = imagen.url
+        elif quitar_imagen:
+            cambios["imagen_url"] = None
+
+        if not cambios:
+            await interaction.response.send_message(
+                "⚠️ Indica al menos un dato para modificar.", ephemeral=True
+            )
+            return
+
+        evento = storage.actualizar_evento(evento_id, **cambios)
+        aviso = ""
+        try:
+            canal = self.bot.get_channel(evento["canal_id"])
+            if canal is None:
+                canal = await self.bot.fetch_channel(evento["canal_id"])
+            mensaje = await canal.fetch_message(evento["mensaje_id"])
+            view = EventoView(evento_id, abierto=evento["estado"] == "abierto")
+            await mensaje.edit(embed=construir_embed_evento(evento), view=view)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException, AttributeError):
+            aviso = "\n⚠️ Los datos se guardaron, pero no pude actualizar el mensaje publicado."
+
+        await interaction.response.send_message(
+            f"✅ Evento **{evento['titulo']}** (ID: {evento_id}) actualizado sin perder "
+            f"participantes ni equipos.{aviso}",
+            ephemeral=True,
+        )
+
     # ---------------------- REGISTRAR GANADOR ----------------------
     @evento_group.command(name="registrar_ganador", description="Registra al ganador y finaliza el evento")
     @app_commands.describe(
@@ -408,6 +516,7 @@ class Eventos(commands.Cog):
     # Manejo de errores de permisos para todo el grupo
     @crear.error
     @cerrar.error
+    @editar.error
     @registrar_ganador.error
     @cancelar.error
     @eliminar.error

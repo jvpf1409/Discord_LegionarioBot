@@ -99,6 +99,7 @@ Discord sin romper los permisos.
 |---|---|
 | `/evento crear titulo tipo_inscripcion fecha hora canal_publicacion [imagen] [canal_inscripciones]` | Abre un formulario para la descripción y publica el evento con embed + botones |
 | `/evento cerrar evento_id` | Cierra inscripciones, deshabilita el botón |
+| `/evento editar evento_id [titulo] [descripcion] [fecha] [hora] [imagen] [quitar_imagen]` | Edita un evento sin perder participantes o equipos (solo Legionario Maestro) |
 | `/evento registrar_ganador evento_id [ganador] [ganador_texto] [numero_equipo]` | Marca al usuario, texto libre o equipo ganador y finaliza el evento |
 | `/evento listar [estado]` | Lista eventos del servidor (abiertos/cerrados/finalizados) |
 | `/evento cancelar evento_id` | Cancela el evento por completo |
