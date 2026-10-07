@@ -13,6 +13,8 @@ import os
 import psycopg
 from psycopg.types.json import Json
 
+from utils.equipos import numerar_equipo
+
 DATABASE_URL = os.environ["DATABASE_URL"]
 
 
@@ -289,6 +291,7 @@ def agregar_equipo(evento_id: str, equipo: dict) -> tuple[bool, str]:
             for e in data["equipos"]:
                 if e["user_id"] == equipo["user_id"]:
                     return False, "Ya inscribiste un equipo en este evento."
+            numerar_equipo(data, equipo)
             data["equipos"].append(equipo)
             conn.execute("UPDATE eventos SET data = %s WHERE id = %s", (Json(data), int(evento_id)))
     return True, "Equipo inscrito correctamente."

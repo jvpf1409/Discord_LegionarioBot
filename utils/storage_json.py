@@ -7,6 +7,8 @@ import json
 import os
 import threading
 
+from utils.equipos import numerar_equipo
+
 DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "eventos.json")
 _lock = threading.Lock()
 
@@ -202,6 +204,7 @@ def agregar_equipo(evento_id: str, equipo: dict) -> tuple[bool, str]:
     for e in evento["equipos"]:
         if e["user_id"] == equipo["user_id"]:
             return False, "Ya inscribiste un equipo en este evento."
+    numerar_equipo(evento, equipo)
     evento["equipos"].append(equipo)
     guardar_datos(data)
     return True, "Equipo inscrito correctamente."

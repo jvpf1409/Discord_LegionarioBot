@@ -293,37 +293,6 @@ class Bienvenida(commands.Cog):
         self.bot = bot
 
     @app_commands.command(
-        name="probar_bienvenida",
-        description="Genera una vista previa privada de la bienvenida.",
-    )
-    @app_commands.guild_only()
-    @es_administrador()
-    async def probar_bienvenida(self, interaction: discord.Interaction) -> None:
-        if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message(
-                "Este comando solo funciona dentro del servidor.",
-                ephemeral=True,
-            )
-            return
-
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            card = await crear_tarjeta(interaction.user)
-        except (discord.HTTPException, OSError):
-            await interaction.followup.send(
-                "No pude generar la tarjeta. Revisa la imagen configurada en "
-                "`WELCOME_BACKGROUND`.",
-                ephemeral=True,
-            )
-            return
-
-        await interaction.followup.send(
-            content="Vista previa de la bienvenida:",
-            file=card,
-            ephemeral=True,
-        )
-
-    @app_commands.command(
         name="publicar_registro",
         description="Publica el panel permanente de registro en el canal configurado.",
     )

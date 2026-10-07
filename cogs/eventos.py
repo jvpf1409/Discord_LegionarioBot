@@ -11,11 +11,27 @@ from discord.ext import commands
 
 from utils import storage
 from utils.anuncios import anunciar_publicacion
+from utils.banner_ganador import ERRORES_IMAGEN, crear_banner_ganador, validar_imagen_fondo
+from utils.equipos import buscar_equipo, numero_de_equipo
 from utils.permisos import es_administrador, es_organizador, mensaje_error_permiso
 from utils.tiempo import fecha_hora_desde_timestamp, parse_fecha_hora
 from cogs.vistas import EventoView, construir_embed_evento
 
 logger = logging.getLogger(__name__)
+
+
+def _construir_anuncio_ganador(
+    titulo_evento: str,
+    nombre_ganador: str,
+    integrantes: str | None = None,
+) -> str:
+    anuncio = (
+        f"🏆 **¡Tenemos ganador en {titulo_evento}!**\n"
+        f"{nombre_ganador} se lleva la victoria 🎉"
+    )
+    if integrantes is not None:
+        anuncio += f"\n\n**Integrantes**\n{integrantes}"
+    return anuncio
 
 class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
     """
@@ -356,8 +372,8 @@ class Eventos(commands.Cog):
     @evento_group.command(name="registrar_ganador", description="Registra al ganador y finaliza el evento")
     @app_commands.describe(
         evento_id="ID del evento",
+        imagen_fondo="Imagen de fondo personalizada para el banner del ganador",
         ganador="Usuario ganador (opcional, solo para eventos individuales)",
-        ganador_texto="Nombre o texto libre del ganador (alternativa a seleccionar un usuario)",
         numero_equipo="Número del equipo ganador (solo para eventos grupales)",
     )
     @es_organizador()
@@ -365,13 +381,17 @@ class Eventos(commands.Cog):
         self,
         interaction: discord.Interaction,
         evento_id: str,
+        imagen_fondo: discord.Attachment,
         ganador: discord.Member = None,
-        ganador_texto: app_commands.Range[str, 1, 200] = None,
-        numero_equipo: app_commands.Range[int, 1, 20] = None,
+        numero_equipo: app_commands.Range[int, 1] = None,
     ):
         evento = storage.obtener_evento(evento_id)
         if evento is None:
             await interaction.response.send_message("❌ No existe ese evento.", ephemeral=True)
+            return
+        error_imagen = validar_imagen_fondo(imagen_fondo)
+        if error_imagen:
+            await interaction.response.send_message(error_imagen, ephemeral=True)
             return
         if evento["tipo_inscripcion"] == "grupal":
             if numero_equipo is None:
@@ -382,51 +402,58 @@ class Eventos(commands.Cog):
             if not evento["equipos"]:
                 await interaction.response.send_message("⚠️ No hay equipos inscritos en este evento.", ephemeral=True)
                 return
-            if numero_equipo > len(evento["equipos"]):
+            equipo_ganador = buscar_equipo(evento, numero_equipo)
+            if equipo_ganador is None:
+                disponibles = ", ".join(
+                    f"#{numero_de_equipo(e, posicion)}"
+                    for posicion, e in enumerate(evento["equipos"], start=1)
+                )
                 await interaction.response.send_message(
-                    f"❌ Ese equipo no existe. Hay {len(evento['equipos'])} equipos.", ephemeral=True
+                    f"❌ Ese equipo no existe. Equipos inscritos: {disponibles}.", ephemeral=True
                 )
                 return
-            equipo_ganador = evento["equipos"][numero_equipo - 1]
             nombre_ganador = equipo_ganador["nombre_equipo"]
-            detalle_nombre = "Integrantes"
-            detalle = "\n".join(
+            miembro_banner = None
+            integrantes = "\n".join(
                 f"• **{i['rol']}** — {i['personaje']}" for i in equipo_ganador["integrantes"]
             ) or "_(sin integrantes)_"
         else:
-            if ganador is None and ganador_texto is None:
+            if ganador is None:
                 await interaction.response.send_message(
-                    "❌ Selecciona `ganador` o escribe `ganador_texto` para este evento individual.",
+                    "❌ Selecciona `ganador` para este evento individual.",
                     ephemeral=True,
                 )
                 return
-            if ganador is not None and ganador_texto is not None:
+            participante = next(
+                (p for p in evento["participantes"] if p["user_id"] == ganador.id), None
+            )
+            if participante is None:
                 await interaction.response.send_message(
-                    "❌ Usa solo una opción: `ganador` o `ganador_texto`.",
-                    ephemeral=True,
+                    "❌ Ese usuario no está inscrito en el evento.", ephemeral=True
                 )
                 return
+            nombre_ganador = ganador.mention
+            miembro_banner = ganador
+            integrantes = None
 
-            if ganador is not None:
-                participante = next(
-                    (p for p in evento["participantes"] if p["user_id"] == ganador.id), None
-                )
-                if participante is None:
-                    await interaction.response.send_message(
-                        "❌ Ese usuario no está inscrito en el evento.", ephemeral=True
-                    )
-                    return
-                nombre_ganador = ganador.mention
-            else:
-                nombre_ganador = ganador_texto.strip()
-                if not nombre_ganador:
-                    await interaction.response.send_message(
-                        "❌ `ganador_texto` no puede estar vacío.", ephemeral=True
-                    )
-                    return
-
-            detalle_nombre = "Ganador"
-            detalle = nombre_ganador
+        await interaction.response.defer()
+        try:
+            fondo_data = await imagen_fondo.read()
+            banner = await crear_banner_ganador(
+                fondo_data,
+                miembro_banner,
+                nombre_equipo=nombre_ganador if miembro_banner is None else None,
+            )
+        except ERRORES_IMAGEN:
+            logger.exception("La imagen de fondo del evento %s no es válida", evento_id)
+            # Tras un defer público, el primer followup reemplazaría el mensaje
+            # visible para todos; se borra para que el error llegue en privado.
+            await interaction.delete_original_response()
+            await interaction.followup.send(
+                "❌ No pude procesar esa imagen. Prueba con un archivo PNG, JPG o WebP válido.",
+                ephemeral=True,
+            )
+            return
         storage.actualizar_evento(evento_id, estado="finalizado", ganador=nombre_ganador)
 
         evento = storage.obtener_evento(evento_id)
@@ -437,13 +464,8 @@ class Eventos(commands.Cog):
         except Exception:
             pass
 
-        embed = discord.Embed(
-            title=f"🏆 ¡Tenemos ganador! — {evento['titulo']}",
-            description=f"**{nombre_ganador}** se lleva la victoria 🎉",
-            color=discord.Color.gold(),
-        )
-        embed.add_field(name=detalle_nombre, value=detalle, inline=False)
-        await interaction.response.send_message(embed=embed)
+        anuncio = _construir_anuncio_ganador(evento["titulo"], nombre_ganador, integrantes)
+        await interaction.followup.send(content=anuncio, file=banner)
 
     # ---------------------- LISTAR ----------------------
     @evento_group.command(name="listar", description="Lista los eventos del servidor")

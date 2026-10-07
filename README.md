@@ -11,6 +11,7 @@ wow-bot/
 ├── main.py                 # Punto de entrada del bot
 ├── cogs/
 │   ├── eventos.py           # Comandos slash (/evento crear, cerrar, etc.)
+│   ├── pruebas.py           # Vistas previas privadas (/test ganador, bienvenida)
 │   └── vistas.py            # Botones persistentes + Modal de inscripción
 ├── utils/
 │   ├── storage.py           # Persistencia en JSON
@@ -100,9 +101,11 @@ Discord sin romper los permisos.
 | `/evento crear titulo tipo_inscripcion fecha hora canal_publicacion [imagen] [canal_inscripciones]` | Abre un formulario para la descripción y publica el evento con embed + botones |
 | `/evento cerrar evento_id` | Cierra inscripciones, deshabilita el botón |
 | `/evento editar evento_id [titulo] [descripcion] [fecha] [hora] [imagen] [quitar_imagen]` | Edita un evento sin perder participantes o equipos (solo Legionario Maestro) |
-| `/evento registrar_ganador evento_id [ganador] [ganador_texto] [numero_equipo]` | Marca al usuario, texto libre o equipo ganador y finaliza el evento |
+| `/evento registrar_ganador evento_id imagen_fondo [ganador] [numero_equipo]` | Publica un banner con fondo personalizado, marca al usuario o equipo ganador y finaliza el evento |
 | `/evento listar [estado]` | Lista eventos del servidor (abiertos/cerrados/finalizados) |
 | `/evento cancelar evento_id` | Cancela el evento por completo |
+| `/test ganador nombre_evento imagen_fondo [ganador] [nombre_equipo]` | Genera una vista previa privada individual o grupal del banner del ganador sin modificar ningún evento |
+| `/test bienvenida` | Genera una vista previa privada de la tarjeta de bienvenida (solo Legionario Maestro) |
 | `/raid duplicar raid_id fecha hora` | Duplica una raid conservando sus datos y canales, pero con una fecha y hora nuevas |
 | `/raid editar raid_id [titulo] [descripcion] [fecha] [hora] [imagen] [quitar_imagen]` | Edita una raid sin perder inscritos (solo administradores) |
 | `/raid programar raid_id dia_publicacion hora_publicacion` | Usa una raid existente como plantilla y publica una copia nueva cada semana |
@@ -151,8 +154,12 @@ demás campos se abre un formulario (modal) con un campo de texto tipo párrafo 
    anuncia también en `canal_inscripciones` si se configuró, además de actualizar el embed.
 3. Cuando ya no se aceptan más inscritos: `/evento cerrar evento_id:1`.
 4. Si es grupal, los equipos ya están formados desde la inscripción.
-5. Al terminar una actividad individual, usa `/evento registrar_ganador evento_id:1 ganador:@usuario`.
-   Para una grupal, usa `/evento registrar_ganador evento_id:1 numero_equipo:2`.
+5. Al terminar una actividad individual, usa `/evento registrar_ganador evento_id:1 imagen_fondo:banner.png ganador:@usuario`.
+   Para una grupal, usa `/evento registrar_ganador evento_id:1 imagen_fondo:banner.png numero_equipo:2`.
+   El anuncio incluye un banner con el fondo indicado en el comando y, encima, el
+   avatar del usuario ganador o el nombre del equipo ganador. El número de equipo es
+   el que aparece en el embed (`Equipo #N`); se asigna al inscribirse y no cambia
+   aunque otro equipo se dé de baja.
 
 ## 7. Persistencia y reinicios
 

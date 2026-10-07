@@ -4,6 +4,7 @@ Componentes de UI: botones persistentes e inscripción (individual o por equipos
 
 import discord
 from utils import storage
+from utils.equipos import numero_de_equipo
 
 
 def construir_embed_evento(evento: dict) -> discord.Embed:
@@ -38,10 +39,13 @@ def construir_embed_evento(evento: dict) -> discord.Embed:
         embed.add_field(name="Tipo", value="👥 Grupal", inline=True)
         embed.add_field(name="Equipos", value=str(len(evento["equipos"])), inline=True)
 
-        for equipo in evento["equipos"]:
+        for posicion, equipo in enumerate(evento["equipos"], start=1):
             lineas = "\n".join(f"• **{i['rol']}** — {i['personaje']}" for i in equipo["integrantes"])
             embed.add_field(
-                name=f"🛡️ {equipo['nombre_equipo']} (por {equipo['nombre_discord']})",
+                name=(
+                    f"🛡️ Equipo #{numero_de_equipo(equipo, posicion)} — {equipo['nombre_equipo']} "
+                    f"(por {equipo['nombre_discord']})"
+                ),
                 value=lineas,
                 inline=True,
             )
@@ -123,12 +127,14 @@ class EquipoRosterModal(discord.ui.Modal, title="Inscribir equipo (2/2)"):
 
         if ok:
             evento = storage.obtener_evento(self.evento_id)
+            numero_equipo = equipo["numero"]
             await _actualizar_mensaje_evento(interaction.client, evento)
             lineas = ", ".join(f"{i['rol']}: {i['personaje']}" for i in integrantes)
             await _anunciar_inscripcion(
                 interaction.client,
                 evento,
-                f"👥 Equipo **{self.nombre_equipo}** (por {interaction.user.mention}) se inscribió en "
+                f"👥 Equipo **#{numero_equipo} — {self.nombre_equipo}** "
+                f"(por {interaction.user.mention}) se inscribió en "
                 f"**{evento['titulo']}** — {lineas}.",
             )
 
