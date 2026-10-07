@@ -12,6 +12,9 @@ from discord.ext import commands
 
 from utils import storage
 from utils.anuncios import anunciar_publicacion
+from utils.recordatorios import (
+    AYUDA_DURACION, campos_recordatorio_extra, parsear_duracion, texto_recordatorio_extra,
+)
 from utils.permisos import es_administrador, es_organizador, mensaje_error_permiso
 from utils.tiempo import (
     fecha_hora_desde_timestamp,
@@ -51,8 +54,10 @@ class DescripcionRaidModal(discord.ui.Modal, title="Descripción de la raid"):
         canal_inscripciones_id: int | None,
         guild_id: int,
         creado_por: int,
+        recordatorio_extra_min: int | None = None,
     ):
         super().__init__()
+        self.recordatorio_extra_min = recordatorio_extra_min
         self.titulo = titulo
         self.fecha_hora_ts = fecha_hora_ts
         self.canal_publicacion = canal_publicacion
@@ -86,11 +91,15 @@ class DescripcionRaidModal(discord.ui.Modal, title="Descripción de la raid"):
             )
             return
 
-        storage.actualizar_raid(raid_id, mensaje_id=mensaje.id)
+        campos_extra = campos_recordatorio_extra(
+            self.recordatorio_extra_min, self.fecha_hora_ts, int(time.time())
+        )
+        storage.actualizar_raid(raid_id, mensaje_id=mensaje.id, **campos_extra)
         advertencia = await anunciar_publicacion(
             interaction.client, interaction.guild, "Raid", self.titulo, mensaje
         )
         detalle_aviso = f"\n⚠️ {advertencia}" if advertencia else ""
+        detalle_aviso += texto_recordatorio_extra(self.recordatorio_extra_min, campos_extra)
         await interaction.followup.send(
             f"✅ Raid **{self.titulo}** publicada en {self.canal_publicacion.mention} "
             f"(ID: {raid_id}).{detalle_aviso}",
@@ -176,6 +185,7 @@ class Raids(commands.Cog):
         canal_publicacion="Canal donde se publicará la raid (embed + selects)",
         imagen="Imagen opcional para la raid (banner del jefe, etc.)",
         canal_inscripciones="Canal opcional donde se irá anunciando cada inscripción en vivo",
+        recordatorio_extra="Recordatorio adicional al de 30 min, ej: 2h, 1d, 1d12h (opcional)",
     )
     @es_organizador()
     async def crear(
@@ -187,7 +197,15 @@ class Raids(commands.Cog):
         canal_publicacion: discord.TextChannel,
         imagen: discord.Attachment = None,
         canal_inscripciones: discord.TextChannel = None,
+        recordatorio_extra: str = None,
     ):
+        try:
+            recordatorio_extra_min = parsear_duracion(recordatorio_extra) if recordatorio_extra else None
+        except ValueError:
+            await interaction.response.send_message(
+                f"❌ `recordatorio_extra` no es válido. {AYUDA_DURACION}", ephemeral=True
+            )
+            return
         try:
             fecha_hora_ts = parse_fecha_hora(fecha, hora)
         except ValueError:
@@ -211,6 +229,7 @@ class Raids(commands.Cog):
             canal_inscripciones_id=canal_inscripciones.id if canal_inscripciones else None,
             guild_id=interaction.guild_id,
             creado_por=interaction.user.id,
+            recordatorio_extra_min=recordatorio_extra_min,
         )
         await interaction.response.send_modal(modal)
 
@@ -458,7 +477,13 @@ class Raids(commands.Cog):
             )
             return
 
-        storage.actualizar_raid(nueva_raid_id, mensaje_id=mensaje.id)
+        storage.actualizar_raid(
+            nueva_raid_id,
+            mensaje_id=mensaje.id,
+            **campos_recordatorio_extra(
+                raid_original.get("recordatorio_extra_min"), fecha_hora_ts, int(time.time())
+            ),
+        )
         advertencia = await anunciar_publicacion(
             interaction.client,
             interaction.guild,
@@ -533,6 +558,7 @@ class Raids(commands.Cog):
         hora="Nueva hora HH:MM; conserva la actual si se omite",
         imagen="Nueva imagen (opcional)",
         quitar_imagen="Quita la imagen actual de la raid",
+        recordatorio_extra="Recordatorio adicional al de 30 min, ej: 2h, 1d; 0 para quitarlo",
     )
     @es_administrador()
     async def editar(
@@ -545,7 +571,15 @@ class Raids(commands.Cog):
         hora: str = None,
         imagen: discord.Attachment = None,
         quitar_imagen: bool = False,
+        recordatorio_extra: str = None,
     ):
+        try:
+            recordatorio_extra_min = parsear_duracion(recordatorio_extra) if recordatorio_extra else None
+        except ValueError:
+            await interaction.response.send_message(
+                f"❌ `recordatorio_extra` no es válido. {AYUDA_DURACION}", ephemeral=True
+            )
+            return
         if not raid_id.isdecimal():
             await interaction.response.send_message("❌ El ID de la raid no es válido.", ephemeral=True)
             return
@@ -605,6 +639,19 @@ class Raids(commands.Cog):
         elif quitar_imagen:
             cambios["imagen_url"] = None
 
+        campos_extra = None
+        if recordatorio_extra_min is not None or "fecha_hora_ts" in cambios:
+            # Un cambio de fecha también reprograma el recordatorio extra.
+            minutos = (
+                recordatorio_extra_min
+                if recordatorio_extra_min is not None
+                else raid.get("recordatorio_extra_min")
+            )
+            campos_extra = campos_recordatorio_extra(
+                minutos, cambios.get("fecha_hora_ts", raid.get("fecha_hora_ts")), int(time.time())
+            )
+            cambios.update(campos_extra)
+
         if not cambios:
             await interaction.response.send_message(
                 "⚠️ Indica al menos un dato para modificar.", ephemeral=True
@@ -628,6 +675,10 @@ class Raids(commands.Cog):
         except (discord.Forbidden, discord.NotFound, discord.HTTPException, AttributeError):
             aviso = "\n⚠️ Los datos se guardaron, pero no pude actualizar el mensaje publicado."
 
+        if recordatorio_extra_min == 0:
+            aviso += "\n🔕 Recordatorio extra quitado; queda solo el de 30 minutos."
+        elif campos_extra is not None:
+            aviso += texto_recordatorio_extra(campos_extra["recordatorio_extra_min"], campos_extra)
         await interaction.response.send_message(
             f"✅ Raid **{raid['titulo']}** (ID: {raid_id}) actualizada sin perder inscritos.{aviso}",
             ephemeral=True,
@@ -720,6 +771,8 @@ class Raids(commands.Cog):
             estado=raid["estado"],
             participantes=participantes,
             recordatorio_enviado=raid.get("recordatorio_enviado", False),
+            recordatorio_extra_min=raid.get("recordatorio_extra_min"),
+            recordatorio_extra_enviado=raid.get("recordatorio_extra_enviado", False),
         )
 
         view = EventoView(evento_id, abierto=evento["estado"] == "abierto")

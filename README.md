@@ -65,7 +65,12 @@ ROL_AVISOS_ID=id_del_rol_legionarios       # opcional
 Si configuras `CANAL_AVISOS_ID`, al crear un evento o raid el bot publicará
 automáticamente un aviso con el enlace directo a la publicación. Si además
 configuras `ROL_AVISOS_ID`, mencionará ese rol (por ejemplo, Legionarios).
-El mismo canal y rol reciben un único recordatorio 30 minutos antes del inicio.
+El mismo canal y rol reciben siempre un recordatorio 30 minutos antes del inicio.
+Además, cada evento o raid puede tener un **recordatorio extra** con la anticipación
+que quieras: usa el parámetro `recordatorio_extra` en `crear` o `editar` con valores
+como `2h`, `90m`, `1d` o `1d12h` (entre 5 minutos y 30 días; `0` lo quita al editar).
+Si al crear o editar ese momento ya pasó, no se envía. Las copias de `/raid duplicar`
+y de las raids programadas conservan la anticipación de su raid original.
 Las inscripciones que continúen abiertas se cierran automáticamente 3 horas
 después de la fecha de cada evento o raid. Las programaciones semanales usan
 `ZONA_HORARIA`; cada raid publicada automáticamente puede modificarse después
@@ -98,9 +103,9 @@ Discord sin romper los permisos.
 
 | Comando | Descripción |
 |---|---|
-| `/evento crear titulo tipo_inscripcion fecha hora canal_publicacion [imagen] [canal_inscripciones] [cantidad_equipos]` | Abre un formulario para la descripción y publica el evento con embed + botones. `cantidad_equipos` es obligatorio solo para Equipos armados |
+| `/evento crear titulo tipo_inscripcion fecha hora canal_publicacion [imagen] [canal_inscripciones] [cantidad_equipos] [recordatorio_extra]` | Abre un formulario para la descripción y publica el evento con embed + botones. `cantidad_equipos` es obligatorio solo para Equipos armados |
 | `/evento cerrar evento_id` | Cierra inscripciones, deshabilita el botón |
-| `/evento editar evento_id [titulo] [descripcion] [fecha] [hora] [imagen] [quitar_imagen] [cantidad_equipos]` | Edita un evento sin perder participantes o equipos; en Equipos armados permite ampliar o reducir la cantidad de equipos (solo Legionario Maestro) |
+| `/evento editar evento_id [titulo] [descripcion] [fecha] [hora] [imagen] [quitar_imagen] [cantidad_equipos] [recordatorio_extra]` | Edita un evento sin perder participantes o equipos; en Equipos armados permite ampliar o reducir la cantidad de equipos (solo Legionario Maestro) |
 | `/evento armar_equipos evento_id` | Abre un panel privado para armar los equipos de un evento de Equipos armados y publicarlos |
 | `/evento exportar_inscritos evento_id` | Envía en privado los inscritos de un evento de Equipos armados: un `.txt` con instrucciones listo para pegar en una IA que proponga equipos parejos, y un `.csv` para Excel/Sheets |
 | `/evento registrar_ganador evento_id imagen_fondo [ganador] [numero_equipo]` | Publica un banner con fondo personalizado, marca al usuario o equipo ganador y finaliza el evento |
@@ -110,7 +115,7 @@ Discord sin romper los permisos.
 | `/test equipos_armados [cantidad_equipos] [suplentes] [canal_inscripciones]` | Publica en el canal actual un evento de Equipos armados de prueba con inscritos ficticios (IDs inexistentes, no notifican a nadie) para ensayar `/evento armar_equipos`; se borra con `/evento eliminar` |
 | `/test bienvenida` | Genera una vista previa privada de la tarjeta de bienvenida (solo Legionario Maestro) |
 | `/raid duplicar raid_id fecha hora` | Duplica una raid conservando sus datos y canales, pero con una fecha y hora nuevas |
-| `/raid editar raid_id [titulo] [descripcion] [fecha] [hora] [imagen] [quitar_imagen]` | Edita una raid sin perder inscritos (solo administradores) |
+| `/raid editar raid_id [titulo] [descripcion] [fecha] [hora] [imagen] [quitar_imagen] [recordatorio_extra]` | Edita una raid sin perder inscritos (solo administradores) |
 | `/raid programar raid_id dia_publicacion hora_publicacion` | Usa una raid existente como plantilla y publica una copia nueva cada semana |
 | `/raid programaciones` | Lista las programaciones y sus próximas fechas |
 | `/raid editar_programacion programacion_id hora_publicacion` | Cambia la hora semanal de publicación |

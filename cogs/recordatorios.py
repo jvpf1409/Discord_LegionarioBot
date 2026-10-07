@@ -1,4 +1,5 @@
-"""Tarea periódica para avisar 30 minutos antes de eventos y raids."""
+"""Tarea periódica para avisar antes de eventos y raids: 30 minutos antes y,
+si se configuró, un recordatorio extra con la anticipación elegida."""
 
 import logging
 import time
@@ -7,10 +8,10 @@ from discord.ext import commands, tasks
 
 from utils import storage
 from utils.anuncios import avisos_configurados, enviar_recordatorio
+from utils.recordatorios import VENTANA_RECORDATORIO, accion_recordatorio_extra
 
 
 logger = logging.getLogger(__name__)
-VENTANA_RECORDATORIO = 30 * 60
 
 
 def debe_recordar(item: dict, ahora: int) -> bool:
@@ -42,16 +43,28 @@ class Recordatorios(commands.Cog):
         )
         for tipo, items, estados, actualizar in grupos:
             for item in items:
-                if item.get("estado") not in estados or not debe_recordar(item, ahora):
+                if item.get("estado") not in estados:
                     continue
                 guild = self.bot.get_guild(item["guild_id"])
                 if guild is None:
                     continue
-                error = await enviar_recordatorio(self.bot, guild, tipo, item)
-                if error is None:
-                    actualizar(item["id"], recordatorio_enviado=True)
-                else:
-                    logger.warning("Recordatorio no enviado para %s %s: %s", tipo, item["id"], error)
+
+                extra = accion_recordatorio_extra(item, ahora)
+                if extra == "descartar":
+                    actualizar(item["id"], recordatorio_extra_enviado=True)
+                elif extra == "enviar":
+                    error = await enviar_recordatorio(self.bot, guild, tipo, item)
+                    if error is None:
+                        actualizar(item["id"], recordatorio_extra_enviado=True)
+                    else:
+                        logger.warning("Recordatorio extra no enviado para %s %s: %s", tipo, item["id"], error)
+
+                if debe_recordar(item, ahora):
+                    error = await enviar_recordatorio(self.bot, guild, tipo, item)
+                    if error is None:
+                        actualizar(item["id"], recordatorio_enviado=True)
+                    else:
+                        logger.warning("Recordatorio no enviado para %s %s: %s", tipo, item["id"], error)
 
     @revisar.before_loop
     async def antes_de_revisar(self):

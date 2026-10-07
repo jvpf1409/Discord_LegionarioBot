@@ -5,6 +5,7 @@ crear, cerrar, registrar ganador, listar, cancelar.
 
 import io
 import logging
+import time
 
 import discord
 from discord import app_commands
@@ -15,6 +16,9 @@ from utils.anuncios import anunciar_publicacion
 from utils.banner_ganador import ERRORES_IMAGEN, crear_banner_ganador, validar_imagen_fondo
 from utils.equipos import buscar_equipo, numero_de_equipo
 from utils.equipos_armados import MAX_EQUIPOS, inscritos_csv, texto_para_ia
+from utils.recordatorios import (
+    AYUDA_DURACION, campos_recordatorio_extra, parsear_duracion, texto_recordatorio_extra,
+)
 from utils.permisos import es_administrador, es_organizador, mensaje_error_permiso
 from utils.tiempo import fecha_hora_desde_timestamp, parse_fecha_hora
 from cogs.vistas import EventoView, anunciar_promovidos, construir_embed_evento
@@ -63,9 +67,11 @@ class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
         guild_id: int,
         creado_por: int,
         cantidad_equipos: int | None = None,
+        recordatorio_extra_min: int | None = None,
     ):
         super().__init__()
         self.cantidad_equipos = cantidad_equipos
+        self.recordatorio_extra_min = recordatorio_extra_min
         self.titulo = titulo
         self.tipo_inscripcion = tipo_inscripcion
         self.fecha_hora_ts = fecha_hora_ts
@@ -102,11 +108,15 @@ class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
             )
             return
 
-        storage.actualizar_evento(evento_id, mensaje_id=mensaje.id)
+        campos_extra = campos_recordatorio_extra(
+            self.recordatorio_extra_min, self.fecha_hora_ts, int(time.time())
+        )
+        storage.actualizar_evento(evento_id, mensaje_id=mensaje.id, **campos_extra)
         advertencia = await anunciar_publicacion(
             interaction.client, interaction.guild, "Evento", self.titulo, mensaje
         )
         detalle_aviso = f"\n⚠️ {advertencia}" if advertencia else ""
+        detalle_aviso += texto_recordatorio_extra(self.recordatorio_extra_min, campos_extra)
         await interaction.followup.send(
             f"✅ Evento **{self.titulo}** publicado en {self.canal_publicacion.mention} "
             f"(ID: {evento_id}).{detalle_aviso}",
@@ -190,6 +200,7 @@ class Eventos(commands.Cog):
         imagen="Imagen opcional para el evento (banner, logo del jefe, etc.)",
         canal_inscripciones="Canal opcional donde se irá anunciando cada inscripción en vivo",
         cantidad_equipos="Solo Equipos armados: cuántos equipos de 1 Tank, 1 Healer y 3 DPS se formarán",
+        recordatorio_extra="Recordatorio adicional al de 30 min, ej: 2h, 1d, 1d12h (opcional)",
     )
     @app_commands.choices(tipo_inscripcion=[
         app_commands.Choice(name="Individual", value="individual"),
@@ -208,7 +219,15 @@ class Eventos(commands.Cog):
         imagen: discord.Attachment = None,
         canal_inscripciones: discord.TextChannel = None,
         cantidad_equipos: app_commands.Range[int, 1, MAX_EQUIPOS] = None,
+        recordatorio_extra: str = None,
     ):
+        try:
+            recordatorio_extra_min = parsear_duracion(recordatorio_extra) if recordatorio_extra else None
+        except ValueError:
+            await interaction.response.send_message(
+                f"❌ `recordatorio_extra` no es válido. {AYUDA_DURACION}", ephemeral=True
+            )
+            return
         if tipo_inscripcion.value == "armado" and cantidad_equipos is None:
             await interaction.response.send_message(
                 "❌ Indica `cantidad_equipos` para un evento de Equipos armados.", ephemeral=True
@@ -244,6 +263,7 @@ class Eventos(commands.Cog):
             guild_id=interaction.guild_id,
             creado_por=interaction.user.id,
             cantidad_equipos=cantidad_equipos,
+            recordatorio_extra_min=recordatorio_extra_min,
         )
         await interaction.response.send_modal(modal)
 
@@ -294,6 +314,7 @@ class Eventos(commands.Cog):
         imagen="Nueva imagen (opcional)",
         quitar_imagen="Quita la imagen actual del evento",
         cantidad_equipos="Solo Equipos armados: nueva cantidad de equipos (amplía o reduce los cupos)",
+        recordatorio_extra="Recordatorio adicional al de 30 min, ej: 2h, 1d; 0 para quitarlo",
     )
     @es_administrador()
     async def editar(
@@ -307,7 +328,15 @@ class Eventos(commands.Cog):
         imagen: discord.Attachment = None,
         quitar_imagen: bool = False,
         cantidad_equipos: app_commands.Range[int, 1, MAX_EQUIPOS] = None,
+        recordatorio_extra: str = None,
     ):
+        try:
+            recordatorio_extra_min = parsear_duracion(recordatorio_extra) if recordatorio_extra else None
+        except ValueError:
+            await interaction.response.send_message(
+                f"❌ `recordatorio_extra` no es válido. {AYUDA_DURACION}", ephemeral=True
+            )
+            return
         evento = storage.obtener_evento(evento_id) if evento_id.isdecimal() else None
         if evento is None or evento.get("guild_id") != interaction.guild_id:
             await interaction.response.send_message(
@@ -381,6 +410,19 @@ class Eventos(commands.Cog):
                 return
             cambios["cantidad_equipos"] = cantidad_equipos
 
+        campos_extra = None
+        if recordatorio_extra_min is not None or "fecha_hora_ts" in cambios:
+            # Un cambio de fecha también reprograma el recordatorio extra.
+            minutos = (
+                recordatorio_extra_min
+                if recordatorio_extra_min is not None
+                else evento.get("recordatorio_extra_min")
+            )
+            campos_extra = campos_recordatorio_extra(
+                minutos, cambios.get("fecha_hora_ts", evento.get("fecha_hora_ts")), int(time.time())
+            )
+            cambios.update(campos_extra)
+
         if not cambios:
             await interaction.response.send_message(
                 "⚠️ Indica al menos un dato para modificar.", ephemeral=True
@@ -402,6 +444,10 @@ class Eventos(commands.Cog):
         except (discord.Forbidden, discord.NotFound, discord.HTTPException, AttributeError):
             aviso = "\n⚠️ Los datos se guardaron, pero no pude actualizar el mensaje publicado."
 
+        if recordatorio_extra_min == 0:
+            aviso += "\n🔕 Recordatorio extra quitado; queda solo el de 30 minutos."
+        elif campos_extra is not None:
+            aviso += texto_recordatorio_extra(campos_extra["recordatorio_extra_min"], campos_extra)
         await interaction.response.send_message(
             f"✅ Evento **{evento['titulo']}** (ID: {evento_id}) actualizado sin perder "
             f"participantes ni equipos.{aviso}",
