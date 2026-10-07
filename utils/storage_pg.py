@@ -165,9 +165,10 @@ def crear_evento(
     canal_id: int,
     creado_por: int,
     fecha_hora_ts: int,
-    tipo_inscripcion: str = "individual",  # individual | grupal
+    tipo_inscripcion: str = "individual",  # individual | grupal | armado
     canal_inscripciones_id: int | None = None,
     imagen_url: str | None = None,
+    cantidad_equipos: int | None = None,  # solo tipo armado
 ) -> str:
     data = {
         "titulo": titulo,
@@ -177,6 +178,7 @@ def crear_evento(
         "canal_inscripciones_id": canal_inscripciones_id,
         "mensaje_id": None,
         "tipo_inscripcion": tipo_inscripcion,
+        "cantidad_equipos": cantidad_equipos,
         "fecha_hora_ts": fecha_hora_ts,
         "imagen_url": imagen_url,
         "estado": "abierto",  # abierto | cerrado | finalizado

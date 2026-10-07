@@ -11,7 +11,7 @@ wow-bot/
 ├── main.py                 # Punto de entrada del bot
 ├── cogs/
 │   ├── eventos.py           # Comandos slash (/evento crear, cerrar, etc.)
-│   ├── pruebas.py           # Vistas previas privadas (/test ganador, bienvenida)
+│   ├── pruebas.py           # Comandos de prueba (/test ganador, bienvenida, equipos_armados)
 │   └── vistas.py            # Botones persistentes + Modal de inscripción
 ├── utils/
 │   ├── storage.py           # Persistencia en JSON
@@ -98,13 +98,16 @@ Discord sin romper los permisos.
 
 | Comando | Descripción |
 |---|---|
-| `/evento crear titulo tipo_inscripcion fecha hora canal_publicacion [imagen] [canal_inscripciones]` | Abre un formulario para la descripción y publica el evento con embed + botones |
+| `/evento crear titulo tipo_inscripcion fecha hora canal_publicacion [imagen] [canal_inscripciones] [cantidad_equipos]` | Abre un formulario para la descripción y publica el evento con embed + botones. `cantidad_equipos` es obligatorio solo para Equipos armados |
 | `/evento cerrar evento_id` | Cierra inscripciones, deshabilita el botón |
-| `/evento editar evento_id [titulo] [descripcion] [fecha] [hora] [imagen] [quitar_imagen]` | Edita un evento sin perder participantes o equipos (solo Legionario Maestro) |
+| `/evento editar evento_id [titulo] [descripcion] [fecha] [hora] [imagen] [quitar_imagen] [cantidad_equipos]` | Edita un evento sin perder participantes o equipos; en Equipos armados permite ampliar o reducir la cantidad de equipos (solo Legionario Maestro) |
+| `/evento armar_equipos evento_id` | Abre un panel privado para armar los equipos de un evento de Equipos armados y publicarlos |
+| `/evento exportar_inscritos evento_id` | Envía en privado los inscritos de un evento de Equipos armados: un `.txt` con instrucciones listo para pegar en una IA que proponga equipos parejos, y un `.csv` para Excel/Sheets |
 | `/evento registrar_ganador evento_id imagen_fondo [ganador] [numero_equipo]` | Publica un banner con fondo personalizado, marca al usuario o equipo ganador y finaliza el evento |
 | `/evento listar [estado]` | Lista eventos del servidor (abiertos/cerrados/finalizados) |
 | `/evento cancelar evento_id` | Cancela el evento por completo |
 | `/test ganador nombre_evento imagen_fondo [ganador] [nombre_equipo]` | Genera una vista previa privada individual o grupal del banner del ganador sin modificar ningún evento |
+| `/test equipos_armados [cantidad_equipos] [suplentes] [canal_inscripciones]` | Publica en el canal actual un evento de Equipos armados de prueba con inscritos ficticios (IDs inexistentes, no notifican a nadie) para ensayar `/evento armar_equipos`; se borra con `/evento eliminar` |
 | `/test bienvenida` | Genera una vista previa privada de la tarjeta de bienvenida (solo Legionario Maestro) |
 | `/raid duplicar raid_id fecha hora` | Duplica una raid conservando sus datos y canales, pero con una fecha y hora nuevas |
 | `/raid editar raid_id [titulo] [descripcion] [fecha] [hora] [imagen] [quitar_imagen]` | Edita una raid sin perder inscritos (solo administradores) |
@@ -129,6 +132,24 @@ Discord sin romper los permisos.
   que abre el segundo formulario con los 5 roles (Tank, Healer, DPS x3). No existe
   un límite de equipos: se pueden inscribir equipos hasta que se cierren las
   inscripciones. Los equipos quedan fijos desde la inscripción.
+- **Equipos armados por la organización**: la inscripción es individual, pero la
+  organización arma después equipos parejos de 1 Tank, 1 Healer y 3 DPS. Al crear el
+  evento se indica `cantidad_equipos` (máximo 8), que define los cupos: con 3 equipos
+  hay 3 Tanks, 3 Healers y 9 DPS (melee y ranged cuentan como DPS). Al pulsar
+  **Inscribirse** se elige clase y especialización, y un formulario pide nombre del
+  personaje, item level y puntuación de Raider.IO. Si el rol ya está lleno, la persona
+  queda como **suplente**; titulares y suplentes se ordenan por orden de inscripción,
+  así que si un titular se da de baja o se amplía la cantidad de equipos con
+  `/evento editar`, el primer suplente sube solo y se anuncia en `canal_inscripciones`.
+  Para apoyarse en una IA, `/evento exportar_inscritos` entrega los inscritos con
+  una instrucción ya redactada para que proponga equipos parejos por IO e ilvl.
+  Con `/evento armar_equipos` se abre un panel privado donde se elige, equipo por
+  equipo, el Tank, el Healer y los 3 DPS entre los inscritos de cada rol (quien ya está
+  en un equipo no aparece en los demás), viendo el promedio de ilvl e IO de cada equipo.
+  **Publicar equipos** exige que todos estén completos, los muestra en el embed y los
+  anuncia en el canal del evento mencionando a cada integrante. Se puede volver a abrir
+  el panel para corregirlos y publicarlos otra vez. Los equipos se numeran
+  `Equipo #1`, `#2`, … y se usan igual que los grupales en `/evento registrar_ganador`.
 
 ### Fecha, hora e imagen
 
@@ -153,9 +174,10 @@ demás campos se abre un formulario (modal) con un campo de texto tipo párrafo 
    el bot publica el embed con botones en el canal elegido. Cada inscripción/baja se
    anuncia también en `canal_inscripciones` si se configuró, además de actualizar el embed.
 3. Cuando ya no se aceptan más inscritos: `/evento cerrar evento_id:1`.
-4. Si es grupal, los equipos ya están formados desde la inscripción.
+4. Si es grupal, los equipos ya están formados desde la inscripción. Si es de Equipos
+   armados, usa `/evento armar_equipos evento_id:1` para formarlos y publicarlos.
 5. Al terminar una actividad individual, usa `/evento registrar_ganador evento_id:1 imagen_fondo:banner.png ganador:@usuario`.
-   Para una grupal, usa `/evento registrar_ganador evento_id:1 imagen_fondo:banner.png numero_equipo:2`.
+   Para una grupal o de Equipos armados, usa `/evento registrar_ganador evento_id:1 imagen_fondo:banner.png numero_equipo:2`.
    El anuncio incluye un banner con el fondo indicado en el comando y, encima, el
    avatar del usuario ganador o el nombre del equipo ganador. El número de equipo es
    el que aparece en el embed (`Equipo #N`); se asigna al inscribirse y no cambia

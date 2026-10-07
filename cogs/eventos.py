@@ -3,6 +3,7 @@ Cog con los comandos de administración de eventos:
 crear, cerrar, registrar ganador, listar, cancelar.
 """
 
+import io
 import logging
 
 import discord
@@ -13,9 +14,11 @@ from utils import storage
 from utils.anuncios import anunciar_publicacion
 from utils.banner_ganador import ERRORES_IMAGEN, crear_banner_ganador, validar_imagen_fondo
 from utils.equipos import buscar_equipo, numero_de_equipo
+from utils.equipos_armados import MAX_EQUIPOS, inscritos_csv, texto_para_ia
 from utils.permisos import es_administrador, es_organizador, mensaje_error_permiso
 from utils.tiempo import fecha_hora_desde_timestamp, parse_fecha_hora
-from cogs.vistas import EventoView, construir_embed_evento
+from cogs.vistas import EventoView, anunciar_promovidos, construir_embed_evento
+from cogs.vistas_armado import ArmarEquiposView
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +62,10 @@ class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
         canal_inscripciones_id: int | None,
         guild_id: int,
         creado_por: int,
+        cantidad_equipos: int | None = None,
     ):
         super().__init__()
+        self.cantidad_equipos = cantidad_equipos
         self.titulo = titulo
         self.tipo_inscripcion = tipo_inscripcion
         self.fecha_hora_ts = fecha_hora_ts
@@ -82,6 +87,7 @@ class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
             tipo_inscripcion=self.tipo_inscripcion,
             canal_inscripciones_id=self.canal_inscripciones_id,
             imagen_url=self.imagen_url,
+            cantidad_equipos=self.cantidad_equipos,
         )
         evento = storage.obtener_evento(evento_id)
         embed = construir_embed_evento(evento)
@@ -177,16 +183,18 @@ class Eventos(commands.Cog):
     @evento_group.command(name="crear", description="Crea un nuevo evento con inscripciones abiertas")
     @app_commands.describe(
         titulo="Título del evento (ej: Mítico+ semanal)",
-        tipo_inscripcion="Individual (lista simple de inscritos, sin equipos) o Grupal (equipos completos ya formados)",
+        tipo_inscripcion="Individual (lista simple), Grupal (equipos ya formados) o Equipos armados (individual, la organización arma los equipos)",
         fecha="Fecha del evento en formato DD/MM/AAAA (ej: 30/06/2026)",
         hora="Hora del evento en formato 24h HH:MM (ej: 23:00)",
         canal_publicacion="Canal donde se publicará el evento (embed + botones)",
         imagen="Imagen opcional para el evento (banner, logo del jefe, etc.)",
         canal_inscripciones="Canal opcional donde se irá anunciando cada inscripción en vivo",
+        cantidad_equipos="Solo Equipos armados: cuántos equipos de 1 Tank, 1 Healer y 3 DPS se formarán",
     )
     @app_commands.choices(tipo_inscripcion=[
         app_commands.Choice(name="Individual", value="individual"),
         app_commands.Choice(name="Grupal", value="grupal"),
+        app_commands.Choice(name="Equipos armados por la organización", value="armado"),
     ])
     @es_organizador()
     async def crear(
@@ -199,7 +207,18 @@ class Eventos(commands.Cog):
         canal_publicacion: discord.TextChannel,
         imagen: discord.Attachment = None,
         canal_inscripciones: discord.TextChannel = None,
+        cantidad_equipos: app_commands.Range[int, 1, MAX_EQUIPOS] = None,
     ):
+        if tipo_inscripcion.value == "armado" and cantidad_equipos is None:
+            await interaction.response.send_message(
+                "❌ Indica `cantidad_equipos` para un evento de Equipos armados.", ephemeral=True
+            )
+            return
+        if tipo_inscripcion.value != "armado" and cantidad_equipos is not None:
+            await interaction.response.send_message(
+                "❌ `cantidad_equipos` solo aplica a eventos de Equipos armados.", ephemeral=True
+            )
+            return
         try:
             fecha_hora_ts = parse_fecha_hora(fecha, hora)
         except ValueError:
@@ -224,6 +243,7 @@ class Eventos(commands.Cog):
             canal_inscripciones_id=canal_inscripciones.id if canal_inscripciones else None,
             guild_id=interaction.guild_id,
             creado_por=interaction.user.id,
+            cantidad_equipos=cantidad_equipos,
         )
         await interaction.response.send_modal(modal)
 
@@ -273,6 +293,7 @@ class Eventos(commands.Cog):
         hora="Nueva hora HH:MM; conserva la actual si se omite",
         imagen="Nueva imagen (opcional)",
         quitar_imagen="Quita la imagen actual del evento",
+        cantidad_equipos="Solo Equipos armados: nueva cantidad de equipos (amplía o reduce los cupos)",
     )
     @es_administrador()
     async def editar(
@@ -285,6 +306,7 @@ class Eventos(commands.Cog):
         hora: str = None,
         imagen: discord.Attachment = None,
         quitar_imagen: bool = False,
+        cantidad_equipos: app_commands.Range[int, 1, MAX_EQUIPOS] = None,
     ):
         evento = storage.obtener_evento(evento_id) if evento_id.isdecimal() else None
         if evento is None or evento.get("guild_id") != interaction.guild_id:
@@ -344,13 +366,31 @@ class Eventos(commands.Cog):
         elif quitar_imagen:
             cambios["imagen_url"] = None
 
+        if cantidad_equipos is not None:
+            if evento["tipo_inscripcion"] != "armado":
+                await interaction.response.send_message(
+                    "❌ `cantidad_equipos` solo aplica a eventos de Equipos armados.", ephemeral=True
+                )
+                return
+            if cantidad_equipos < len(evento["equipos"]):
+                await interaction.response.send_message(
+                    f"❌ Ya hay {len(evento['equipos'])} equipos publicados. Vuelve a armarlos "
+                    "con `/evento armar_equipos` antes de reducir la cantidad.",
+                    ephemeral=True,
+                )
+                return
+            cambios["cantidad_equipos"] = cantidad_equipos
+
         if not cambios:
             await interaction.response.send_message(
                 "⚠️ Indica al menos un dato para modificar.", ephemeral=True
             )
             return
 
+        antes = evento
         evento = storage.actualizar_evento(evento_id, **cambios)
+        if evento["tipo_inscripcion"] == "armado":
+            await anunciar_promovidos(self.bot, antes, evento)
         aviso = ""
         try:
             canal = self.bot.get_channel(evento["canal_id"])
@@ -393,14 +433,18 @@ class Eventos(commands.Cog):
         if error_imagen:
             await interaction.response.send_message(error_imagen, ephemeral=True)
             return
-        if evento["tipo_inscripcion"] == "grupal":
+        if evento["tipo_inscripcion"] in ("grupal", "armado"):
             if numero_equipo is None:
                 await interaction.response.send_message(
                     "❌ Indica `numero_equipo` para este evento grupal.", ephemeral=True
                 )
                 return
             if not evento["equipos"]:
-                await interaction.response.send_message("⚠️ No hay equipos inscritos en este evento.", ephemeral=True)
+                if evento["tipo_inscripcion"] == "armado":
+                    mensaje = "⚠️ Aún no se publican los equipos. Usa `/evento armar_equipos`."
+                else:
+                    mensaje = "⚠️ No hay equipos inscritos en este evento."
+                await interaction.response.send_message(mensaje, ephemeral=True)
                 return
             equipo_ganador = buscar_equipo(evento, numero_equipo)
             if equipo_ganador is None:
@@ -467,6 +511,81 @@ class Eventos(commands.Cog):
         anuncio = _construir_anuncio_ganador(evento["titulo"], nombre_ganador, integrantes)
         await interaction.followup.send(content=anuncio, file=banner)
 
+    # ---------------------- ARMAR EQUIPOS ----------------------
+    @evento_group.command(
+        name="armar_equipos",
+        description="Arma y publica los equipos de un evento de Equipos armados",
+    )
+    @app_commands.describe(evento_id="ID del evento")
+    @es_organizador()
+    async def armar_equipos(self, interaction: discord.Interaction, evento_id: str):
+        evento = storage.obtener_evento(evento_id) if evento_id.isdecimal() else None
+        if evento is None or evento.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message(
+                "❌ No existe ese evento en este servidor.", ephemeral=True
+            )
+            return
+        if evento["tipo_inscripcion"] != "armado":
+            await interaction.response.send_message(
+                "❌ Este comando solo aplica a eventos de Equipos armados.", ephemeral=True
+            )
+            return
+        if evento["estado"] == "finalizado":
+            await interaction.response.send_message("⚠️ Este evento ya finalizó.", ephemeral=True)
+            return
+        if not evento["participantes"]:
+            await interaction.response.send_message(
+                "⚠️ Todavía no hay inscritos en este evento.", ephemeral=True
+            )
+            return
+
+        view = ArmarEquiposView(evento, interaction.user.id)
+        await interaction.response.send_message(view.contenido(), view=view, ephemeral=True)
+        view.interaccion_inicial = interaction
+
+    # ---------------------- EXPORTAR INSCRITOS ----------------------
+    @evento_group.command(
+        name="exportar_inscritos",
+        description="Descarga los inscritos de un evento de Equipos armados (para armar equipos con una IA)",
+    )
+    @app_commands.describe(evento_id="ID del evento")
+    @es_organizador()
+    async def exportar_inscritos(self, interaction: discord.Interaction, evento_id: str):
+        evento = storage.obtener_evento(evento_id) if evento_id.isdecimal() else None
+        if evento is None or evento.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message(
+                "❌ No existe ese evento en este servidor.", ephemeral=True
+            )
+            return
+        if evento["tipo_inscripcion"] != "armado":
+            await interaction.response.send_message(
+                "❌ Este comando solo aplica a eventos de Equipos armados.", ephemeral=True
+            )
+            return
+        if not evento["participantes"]:
+            await interaction.response.send_message(
+                "⚠️ Todavía no hay inscritos en este evento.", ephemeral=True
+            )
+            return
+
+        # utf-8-sig para que Excel respete los acentos al abrir el CSV.
+        para_ia = discord.File(
+            io.BytesIO(texto_para_ia(evento).encode("utf-8")),
+            filename=f"evento-{evento_id}-para-ia.txt",
+        )
+        csv_inscritos = discord.File(
+            io.BytesIO(inscritos_csv(evento).encode("utf-8-sig")),
+            filename=f"evento-{evento_id}-inscritos.csv",
+        )
+        await interaction.response.send_message(
+            f"📋 Inscritos de **{evento['titulo']}** ({len(evento['participantes'])}).\n"
+            "• `para-ia.txt`: pégalo completo en la IA, ya incluye las instrucciones.\n"
+            "• `inscritos.csv`: los mismos datos para abrir en Excel o Google Sheets.\n"
+            "Con la propuesta, arma los equipos en `/evento armar_equipos`.",
+            files=[para_ia, csv_inscritos],
+            ephemeral=True,
+        )
+
     # ---------------------- LISTAR ----------------------
     @evento_group.command(name="listar", description="Lista los eventos del servidor")
     @app_commands.describe(estado="Filtra por estado (opcional)")
@@ -485,9 +604,11 @@ class Eventos(commands.Cog):
         for e in eventos:
             if e["tipo_inscripcion"] == "grupal":
                 resumen = f"Equipos: {len(e['equipos'])}"
+            elif e["tipo_inscripcion"] == "armado":
+                resumen = f"Inscritos: {len(e['participantes'])} · Equipos: {e.get('cantidad_equipos', 1)}"
             else:
                 resumen = f"Inscritos: {len(e['participantes'])}"
-            tipo_emoji = "👥" if e["tipo_inscripcion"] == "grupal" else "🙋"
+            tipo_emoji = {"grupal": "👥", "armado": "🧩"}.get(e["tipo_inscripcion"], "🙋")
             if e.get("fecha_hora_ts"):
                 resumen += f"\n📅 <t:{e['fecha_hora_ts']}:f>"
             embed.add_field(
@@ -540,6 +661,8 @@ class Eventos(commands.Cog):
     @cerrar.error
     @editar.error
     @registrar_ganador.error
+    @armar_equipos.error
+    @exportar_inscritos.error
     @cancelar.error
     @eliminar.error
     async def on_permission_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
