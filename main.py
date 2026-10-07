@@ -87,6 +87,7 @@ async def main():
         bot.add_view(RegistroInicialView())
         await bot.load_extension("cogs.control_voz")
         await bot.load_extension("cogs.asistencia")
+        await bot.load_extension("cogs.pruebas")
         await bot.start(TOKEN)
 
 

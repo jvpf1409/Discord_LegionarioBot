@@ -3,7 +3,9 @@ Cog con los comandos de administración de eventos:
 crear, cerrar, registrar ganador, listar, cancelar.
 """
 
+import io
 import logging
+import time
 
 import discord
 from discord import app_commands
@@ -11,11 +13,32 @@ from discord.ext import commands
 
 from utils import storage
 from utils.anuncios import anunciar_publicacion
+from utils.banner_ganador import ERRORES_IMAGEN, crear_banner_ganador, validar_imagen_fondo
+from utils.equipos import buscar_equipo, numero_de_equipo
+from utils.equipos_armados import MAX_EQUIPOS, inscritos_csv, texto_para_ia
+from utils.recordatorios import (
+    AYUDA_DURACION, campos_recordatorio_extra, parsear_duracion, texto_recordatorio_extra,
+)
 from utils.permisos import es_administrador, es_organizador, mensaje_error_permiso
 from utils.tiempo import fecha_hora_desde_timestamp, parse_fecha_hora
-from cogs.vistas import EventoView, construir_embed_evento
+from cogs.vistas import EventoView, anunciar_promovidos, construir_embed_evento
+from cogs.vistas_armado import ArmarEquiposView
 
 logger = logging.getLogger(__name__)
+
+
+def _construir_anuncio_ganador(
+    titulo_evento: str,
+    nombre_ganador: str,
+    integrantes: str | None = None,
+) -> str:
+    anuncio = (
+        f"🏆 **¡Tenemos ganador en {titulo_evento}!**\n"
+        f"{nombre_ganador} se lleva la victoria 🎉"
+    )
+    if integrantes is not None:
+        anuncio += f"\n\n**Integrantes**\n{integrantes}"
+    return anuncio
 
 class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
     """
@@ -43,8 +66,12 @@ class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
         canal_inscripciones_id: int | None,
         guild_id: int,
         creado_por: int,
+        cantidad_equipos: int | None = None,
+        recordatorio_extra_min: int | None = None,
     ):
         super().__init__()
+        self.cantidad_equipos = cantidad_equipos
+        self.recordatorio_extra_min = recordatorio_extra_min
         self.titulo = titulo
         self.tipo_inscripcion = tipo_inscripcion
         self.fecha_hora_ts = fecha_hora_ts
@@ -66,6 +93,7 @@ class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
             tipo_inscripcion=self.tipo_inscripcion,
             canal_inscripciones_id=self.canal_inscripciones_id,
             imagen_url=self.imagen_url,
+            cantidad_equipos=self.cantidad_equipos,
         )
         evento = storage.obtener_evento(evento_id)
         embed = construir_embed_evento(evento)
@@ -80,11 +108,15 @@ class DescripcionEventoModal(discord.ui.Modal, title="Descripción del evento"):
             )
             return
 
-        storage.actualizar_evento(evento_id, mensaje_id=mensaje.id)
+        campos_extra = campos_recordatorio_extra(
+            self.recordatorio_extra_min, self.fecha_hora_ts, int(time.time())
+        )
+        storage.actualizar_evento(evento_id, mensaje_id=mensaje.id, **campos_extra)
         advertencia = await anunciar_publicacion(
             interaction.client, interaction.guild, "Evento", self.titulo, mensaje
         )
         detalle_aviso = f"\n⚠️ {advertencia}" if advertencia else ""
+        detalle_aviso += texto_recordatorio_extra(self.recordatorio_extra_min, campos_extra)
         await interaction.followup.send(
             f"✅ Evento **{self.titulo}** publicado en {self.canal_publicacion.mention} "
             f"(ID: {evento_id}).{detalle_aviso}",
@@ -161,16 +193,19 @@ class Eventos(commands.Cog):
     @evento_group.command(name="crear", description="Crea un nuevo evento con inscripciones abiertas")
     @app_commands.describe(
         titulo="Título del evento (ej: Mítico+ semanal)",
-        tipo_inscripcion="Individual (lista simple de inscritos, sin equipos) o Grupal (equipos completos ya formados)",
+        tipo_inscripcion="Individual (lista simple), Grupal (equipos ya formados) o Equipos armados (individual, la organización arma los equipos)",
         fecha="Fecha del evento en formato DD/MM/AAAA (ej: 30/06/2026)",
         hora="Hora del evento en formato 24h HH:MM (ej: 23:00)",
         canal_publicacion="Canal donde se publicará el evento (embed + botones)",
         imagen="Imagen opcional para el evento (banner, logo del jefe, etc.)",
         canal_inscripciones="Canal opcional donde se irá anunciando cada inscripción en vivo",
+        cantidad_equipos="Solo Equipos armados: cuántos equipos de 1 Tank, 1 Healer y 3 DPS se formarán",
+        recordatorio_extra="Recordatorio adicional al de 30 min, ej: 2h, 1d, 1d12h (opcional)",
     )
     @app_commands.choices(tipo_inscripcion=[
         app_commands.Choice(name="Individual", value="individual"),
         app_commands.Choice(name="Grupal", value="grupal"),
+        app_commands.Choice(name="Equipos armados por la organización", value="armado"),
     ])
     @es_organizador()
     async def crear(
@@ -183,7 +218,26 @@ class Eventos(commands.Cog):
         canal_publicacion: discord.TextChannel,
         imagen: discord.Attachment = None,
         canal_inscripciones: discord.TextChannel = None,
+        cantidad_equipos: app_commands.Range[int, 1, MAX_EQUIPOS] = None,
+        recordatorio_extra: str = None,
     ):
+        try:
+            recordatorio_extra_min = parsear_duracion(recordatorio_extra) if recordatorio_extra else None
+        except ValueError:
+            await interaction.response.send_message(
+                f"❌ `recordatorio_extra` no es válido. {AYUDA_DURACION}", ephemeral=True
+            )
+            return
+        if tipo_inscripcion.value == "armado" and cantidad_equipos is None:
+            await interaction.response.send_message(
+                "❌ Indica `cantidad_equipos` para un evento de Equipos armados.", ephemeral=True
+            )
+            return
+        if tipo_inscripcion.value != "armado" and cantidad_equipos is not None:
+            await interaction.response.send_message(
+                "❌ `cantidad_equipos` solo aplica a eventos de Equipos armados.", ephemeral=True
+            )
+            return
         try:
             fecha_hora_ts = parse_fecha_hora(fecha, hora)
         except ValueError:
@@ -208,6 +262,8 @@ class Eventos(commands.Cog):
             canal_inscripciones_id=canal_inscripciones.id if canal_inscripciones else None,
             guild_id=interaction.guild_id,
             creado_por=interaction.user.id,
+            cantidad_equipos=cantidad_equipos,
+            recordatorio_extra_min=recordatorio_extra_min,
         )
         await interaction.response.send_modal(modal)
 
@@ -257,6 +313,8 @@ class Eventos(commands.Cog):
         hora="Nueva hora HH:MM; conserva la actual si se omite",
         imagen="Nueva imagen (opcional)",
         quitar_imagen="Quita la imagen actual del evento",
+        cantidad_equipos="Solo Equipos armados: nueva cantidad de equipos (amplía o reduce los cupos)",
+        recordatorio_extra="Recordatorio adicional al de 30 min, ej: 2h, 1d; 0 para quitarlo",
     )
     @es_administrador()
     async def editar(
@@ -269,7 +327,16 @@ class Eventos(commands.Cog):
         hora: str = None,
         imagen: discord.Attachment = None,
         quitar_imagen: bool = False,
+        cantidad_equipos: app_commands.Range[int, 1, MAX_EQUIPOS] = None,
+        recordatorio_extra: str = None,
     ):
+        try:
+            recordatorio_extra_min = parsear_duracion(recordatorio_extra) if recordatorio_extra else None
+        except ValueError:
+            await interaction.response.send_message(
+                f"❌ `recordatorio_extra` no es válido. {AYUDA_DURACION}", ephemeral=True
+            )
+            return
         evento = storage.obtener_evento(evento_id) if evento_id.isdecimal() else None
         if evento is None or evento.get("guild_id") != interaction.guild_id:
             await interaction.response.send_message(
@@ -328,13 +395,44 @@ class Eventos(commands.Cog):
         elif quitar_imagen:
             cambios["imagen_url"] = None
 
+        if cantidad_equipos is not None:
+            if evento["tipo_inscripcion"] != "armado":
+                await interaction.response.send_message(
+                    "❌ `cantidad_equipos` solo aplica a eventos de Equipos armados.", ephemeral=True
+                )
+                return
+            if cantidad_equipos < len(evento["equipos"]):
+                await interaction.response.send_message(
+                    f"❌ Ya hay {len(evento['equipos'])} equipos publicados. Vuelve a armarlos "
+                    "con `/evento armar_equipos` antes de reducir la cantidad.",
+                    ephemeral=True,
+                )
+                return
+            cambios["cantidad_equipos"] = cantidad_equipos
+
+        campos_extra = None
+        if recordatorio_extra_min is not None or "fecha_hora_ts" in cambios:
+            # Un cambio de fecha también reprograma el recordatorio extra.
+            minutos = (
+                recordatorio_extra_min
+                if recordatorio_extra_min is not None
+                else evento.get("recordatorio_extra_min")
+            )
+            campos_extra = campos_recordatorio_extra(
+                minutos, cambios.get("fecha_hora_ts", evento.get("fecha_hora_ts")), int(time.time())
+            )
+            cambios.update(campos_extra)
+
         if not cambios:
             await interaction.response.send_message(
                 "⚠️ Indica al menos un dato para modificar.", ephemeral=True
             )
             return
 
+        antes = evento
         evento = storage.actualizar_evento(evento_id, **cambios)
+        if evento["tipo_inscripcion"] == "armado":
+            await anunciar_promovidos(self.bot, antes, evento)
         aviso = ""
         try:
             canal = self.bot.get_channel(evento["canal_id"])
@@ -346,6 +444,10 @@ class Eventos(commands.Cog):
         except (discord.Forbidden, discord.NotFound, discord.HTTPException, AttributeError):
             aviso = "\n⚠️ Los datos se guardaron, pero no pude actualizar el mensaje publicado."
 
+        if recordatorio_extra_min == 0:
+            aviso += "\n🔕 Recordatorio extra quitado; queda solo el de 30 minutos."
+        elif campos_extra is not None:
+            aviso += texto_recordatorio_extra(campos_extra["recordatorio_extra_min"], campos_extra)
         await interaction.response.send_message(
             f"✅ Evento **{evento['titulo']}** (ID: {evento_id}) actualizado sin perder "
             f"participantes ni equipos.{aviso}",
@@ -356,8 +458,8 @@ class Eventos(commands.Cog):
     @evento_group.command(name="registrar_ganador", description="Registra al ganador y finaliza el evento")
     @app_commands.describe(
         evento_id="ID del evento",
+        imagen_fondo="Imagen de fondo personalizada para el banner del ganador",
         ganador="Usuario ganador (opcional, solo para eventos individuales)",
-        ganador_texto="Nombre o texto libre del ganador (alternativa a seleccionar un usuario)",
         numero_equipo="Número del equipo ganador (solo para eventos grupales)",
     )
     @es_organizador()
@@ -365,68 +467,83 @@ class Eventos(commands.Cog):
         self,
         interaction: discord.Interaction,
         evento_id: str,
+        imagen_fondo: discord.Attachment,
         ganador: discord.Member = None,
-        ganador_texto: app_commands.Range[str, 1, 200] = None,
-        numero_equipo: app_commands.Range[int, 1, 20] = None,
+        numero_equipo: app_commands.Range[int, 1] = None,
     ):
         evento = storage.obtener_evento(evento_id)
         if evento is None:
             await interaction.response.send_message("❌ No existe ese evento.", ephemeral=True)
             return
-        if evento["tipo_inscripcion"] == "grupal":
+        error_imagen = validar_imagen_fondo(imagen_fondo)
+        if error_imagen:
+            await interaction.response.send_message(error_imagen, ephemeral=True)
+            return
+        if evento["tipo_inscripcion"] in ("grupal", "armado"):
             if numero_equipo is None:
                 await interaction.response.send_message(
                     "❌ Indica `numero_equipo` para este evento grupal.", ephemeral=True
                 )
                 return
             if not evento["equipos"]:
-                await interaction.response.send_message("⚠️ No hay equipos inscritos en este evento.", ephemeral=True)
+                if evento["tipo_inscripcion"] == "armado":
+                    mensaje = "⚠️ Aún no se publican los equipos. Usa `/evento armar_equipos`."
+                else:
+                    mensaje = "⚠️ No hay equipos inscritos en este evento."
+                await interaction.response.send_message(mensaje, ephemeral=True)
                 return
-            if numero_equipo > len(evento["equipos"]):
+            equipo_ganador = buscar_equipo(evento, numero_equipo)
+            if equipo_ganador is None:
+                disponibles = ", ".join(
+                    f"#{numero_de_equipo(e, posicion)}"
+                    for posicion, e in enumerate(evento["equipos"], start=1)
+                )
                 await interaction.response.send_message(
-                    f"❌ Ese equipo no existe. Hay {len(evento['equipos'])} equipos.", ephemeral=True
+                    f"❌ Ese equipo no existe. Equipos inscritos: {disponibles}.", ephemeral=True
                 )
                 return
-            equipo_ganador = evento["equipos"][numero_equipo - 1]
             nombre_ganador = equipo_ganador["nombre_equipo"]
-            detalle_nombre = "Integrantes"
-            detalle = "\n".join(
+            miembro_banner = None
+            integrantes = "\n".join(
                 f"• **{i['rol']}** — {i['personaje']}" for i in equipo_ganador["integrantes"]
             ) or "_(sin integrantes)_"
         else:
-            if ganador is None and ganador_texto is None:
+            if ganador is None:
                 await interaction.response.send_message(
-                    "❌ Selecciona `ganador` o escribe `ganador_texto` para este evento individual.",
+                    "❌ Selecciona `ganador` para este evento individual.",
                     ephemeral=True,
                 )
                 return
-            if ganador is not None and ganador_texto is not None:
+            participante = next(
+                (p for p in evento["participantes"] if p["user_id"] == ganador.id), None
+            )
+            if participante is None:
                 await interaction.response.send_message(
-                    "❌ Usa solo una opción: `ganador` o `ganador_texto`.",
-                    ephemeral=True,
+                    "❌ Ese usuario no está inscrito en el evento.", ephemeral=True
                 )
                 return
+            nombre_ganador = ganador.mention
+            miembro_banner = ganador
+            integrantes = None
 
-            if ganador is not None:
-                participante = next(
-                    (p for p in evento["participantes"] if p["user_id"] == ganador.id), None
-                )
-                if participante is None:
-                    await interaction.response.send_message(
-                        "❌ Ese usuario no está inscrito en el evento.", ephemeral=True
-                    )
-                    return
-                nombre_ganador = ganador.mention
-            else:
-                nombre_ganador = ganador_texto.strip()
-                if not nombre_ganador:
-                    await interaction.response.send_message(
-                        "❌ `ganador_texto` no puede estar vacío.", ephemeral=True
-                    )
-                    return
-
-            detalle_nombre = "Ganador"
-            detalle = nombre_ganador
+        await interaction.response.defer()
+        try:
+            fondo_data = await imagen_fondo.read()
+            banner = await crear_banner_ganador(
+                fondo_data,
+                miembro_banner,
+                nombre_equipo=nombre_ganador if miembro_banner is None else None,
+            )
+        except ERRORES_IMAGEN:
+            logger.exception("La imagen de fondo del evento %s no es válida", evento_id)
+            # Tras un defer público, el primer followup reemplazaría el mensaje
+            # visible para todos; se borra para que el error llegue en privado.
+            await interaction.delete_original_response()
+            await interaction.followup.send(
+                "❌ No pude procesar esa imagen. Prueba con un archivo PNG, JPG o WebP válido.",
+                ephemeral=True,
+            )
+            return
         storage.actualizar_evento(evento_id, estado="finalizado", ganador=nombre_ganador)
 
         evento = storage.obtener_evento(evento_id)
@@ -437,13 +554,83 @@ class Eventos(commands.Cog):
         except Exception:
             pass
 
-        embed = discord.Embed(
-            title=f"🏆 ¡Tenemos ganador! — {evento['titulo']}",
-            description=f"**{nombre_ganador}** se lleva la victoria 🎉",
-            color=discord.Color.gold(),
+        anuncio = _construir_anuncio_ganador(evento["titulo"], nombre_ganador, integrantes)
+        await interaction.followup.send(content=anuncio, file=banner)
+
+    # ---------------------- ARMAR EQUIPOS ----------------------
+    @evento_group.command(
+        name="armar_equipos",
+        description="Arma y publica los equipos de un evento de Equipos armados",
+    )
+    @app_commands.describe(evento_id="ID del evento")
+    @es_organizador()
+    async def armar_equipos(self, interaction: discord.Interaction, evento_id: str):
+        evento = storage.obtener_evento(evento_id) if evento_id.isdecimal() else None
+        if evento is None or evento.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message(
+                "❌ No existe ese evento en este servidor.", ephemeral=True
+            )
+            return
+        if evento["tipo_inscripcion"] != "armado":
+            await interaction.response.send_message(
+                "❌ Este comando solo aplica a eventos de Equipos armados.", ephemeral=True
+            )
+            return
+        if evento["estado"] == "finalizado":
+            await interaction.response.send_message("⚠️ Este evento ya finalizó.", ephemeral=True)
+            return
+        if not evento["participantes"]:
+            await interaction.response.send_message(
+                "⚠️ Todavía no hay inscritos en este evento.", ephemeral=True
+            )
+            return
+
+        view = ArmarEquiposView(evento, interaction.user.id)
+        await interaction.response.send_message(view.contenido(), view=view, ephemeral=True)
+        view.interaccion_inicial = interaction
+
+    # ---------------------- EXPORTAR INSCRITOS ----------------------
+    @evento_group.command(
+        name="exportar_inscritos",
+        description="Descarga los inscritos de un evento de Equipos armados (para armar equipos con una IA)",
+    )
+    @app_commands.describe(evento_id="ID del evento")
+    @es_organizador()
+    async def exportar_inscritos(self, interaction: discord.Interaction, evento_id: str):
+        evento = storage.obtener_evento(evento_id) if evento_id.isdecimal() else None
+        if evento is None or evento.get("guild_id") != interaction.guild_id:
+            await interaction.response.send_message(
+                "❌ No existe ese evento en este servidor.", ephemeral=True
+            )
+            return
+        if evento["tipo_inscripcion"] != "armado":
+            await interaction.response.send_message(
+                "❌ Este comando solo aplica a eventos de Equipos armados.", ephemeral=True
+            )
+            return
+        if not evento["participantes"]:
+            await interaction.response.send_message(
+                "⚠️ Todavía no hay inscritos en este evento.", ephemeral=True
+            )
+            return
+
+        # utf-8-sig para que Excel respete los acentos al abrir el CSV.
+        para_ia = discord.File(
+            io.BytesIO(texto_para_ia(evento).encode("utf-8")),
+            filename=f"evento-{evento_id}-para-ia.txt",
         )
-        embed.add_field(name=detalle_nombre, value=detalle, inline=False)
-        await interaction.response.send_message(embed=embed)
+        csv_inscritos = discord.File(
+            io.BytesIO(inscritos_csv(evento).encode("utf-8-sig")),
+            filename=f"evento-{evento_id}-inscritos.csv",
+        )
+        await interaction.response.send_message(
+            f"📋 Inscritos de **{evento['titulo']}** ({len(evento['participantes'])}).\n"
+            "• `para-ia.txt`: pégalo completo en la IA, ya incluye las instrucciones.\n"
+            "• `inscritos.csv`: los mismos datos para abrir en Excel o Google Sheets.\n"
+            "Con la propuesta, arma los equipos en `/evento armar_equipos`.",
+            files=[para_ia, csv_inscritos],
+            ephemeral=True,
+        )
 
     # ---------------------- LISTAR ----------------------
     @evento_group.command(name="listar", description="Lista los eventos del servidor")
@@ -463,9 +650,11 @@ class Eventos(commands.Cog):
         for e in eventos:
             if e["tipo_inscripcion"] == "grupal":
                 resumen = f"Equipos: {len(e['equipos'])}"
+            elif e["tipo_inscripcion"] == "armado":
+                resumen = f"Inscritos: {len(e['participantes'])} · Equipos: {e.get('cantidad_equipos', 1)}"
             else:
                 resumen = f"Inscritos: {len(e['participantes'])}"
-            tipo_emoji = "👥" if e["tipo_inscripcion"] == "grupal" else "🙋"
+            tipo_emoji = {"grupal": "👥", "armado": "🧩"}.get(e["tipo_inscripcion"], "🙋")
             if e.get("fecha_hora_ts"):
                 resumen += f"\n📅 <t:{e['fecha_hora_ts']}:f>"
             embed.add_field(
@@ -518,6 +707,8 @@ class Eventos(commands.Cog):
     @cerrar.error
     @editar.error
     @registrar_ganador.error
+    @armar_equipos.error
+    @exportar_inscritos.error
     @cancelar.error
     @eliminar.error
     async def on_permission_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):

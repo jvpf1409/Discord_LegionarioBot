@@ -1,9 +1,85 @@
 """
-Componentes de UI: botones persistentes e inscripción (individual o por equipos).
+Componentes de UI: botones persistentes e inscripción (individual, por
+equipos o individual para equipos armados por la organización).
 """
 
 import discord
 from utils import storage
+from utils import equipos_armados as armado
+from utils.equipos import numero_de_equipo
+from utils.wow_data import CLASES, icono_clase, icono_especializacion, rol_de
+
+
+def _linea_inscrito_armado(p: dict, con_icono: bool = True) -> str:
+    icono = ""
+    if con_icono:
+        icono = (icono_especializacion(p["clase"], p["especializacion"]) or icono_clase(p["clase"]) or "▫️") + " "
+    return (
+        f"{icono}**{p['personaje']}** — {p['especializacion']} · "
+        f"{p['ilvl']} ilvl · {p['io']} IO · <@{p['user_id']}>"
+    )
+
+
+# Línea "vacía" al final de un campo: Discord recorta los saltos de línea
+# finales, pero no un espacio de ancho cero, así que separa visualmente los títulos.
+SEPARADOR = "\n​"
+
+
+def _campos_armado(evento: dict, con_iconos: bool) -> list[tuple[str, str, bool]]:
+    campos = []
+
+    def bloques(nombre: str, inscritos: list[dict], prefijos: list[str] | None = None):
+        lineas = [
+            (prefijos[i] if prefijos else "") + _linea_inscrito_armado(p, con_iconos)
+            for i, p in enumerate(inscritos)
+        ]
+        partes = armado.dividir_en_campos(lineas, limite=1024 - len(SEPARADOR))
+        for i, bloque in enumerate(partes):
+            if i == len(partes) - 1:
+                bloque += SEPARADOR
+            campos.append((nombre if i == 0 else f"{nombre} (cont.)", bloque, False))
+
+    if evento["equipos"]:
+        # Con los equipos publicados se muestran ellos en lugar de la lista por rol.
+        en_equipo = set()
+        for equipo in evento["equipos"]:
+            lineas = []
+            for i in equipo["integrantes"]:
+                en_equipo.add(i["user_id"])
+                lineas.append(f"• **{i['rol']}** — {i['personaje']} (<@{i['user_id']}>)")
+            nombre = f"🧩 Equipo #{equipo['numero']}"
+            prom = armado.promedios(equipo["integrantes"])
+            if prom:
+                nombre += f" · {prom[0]} ilvl · {prom[1]} IO"
+            campos.append((nombre, "\n".join(lineas) or "—", True))
+        bloques("Sin equipo", [p for p in evento["participantes"] if p["user_id"] not in en_equipo])
+        return campos
+
+    # Primero los titulares por rol; los suplentes, todos juntos al final.
+    reparto = armado.repartir(evento)
+    for c, (titulares, _) in reparto.items():
+        bloques(f"{armado.EMOJIS_CATEGORIA[c]} {armado.NOMBRES_CATEGORIA[c]}", titulares)
+    suplentes = [(c, p) for c, (_, lista) in reparto.items() for p in lista]
+    bloques(
+        "⏳ Suplentes",
+        [p for _, p in suplentes],
+        prefijos=[f"{armado.EMOJIS_CATEGORIA[c]} " for c, _ in suplentes],
+    )
+    return campos
+
+
+def _agregar_campos_armado(embed: discord.Embed, evento: dict):
+    embed.add_field(name="Tipo", value="🧩 Equipos armados", inline=True)
+    embed.add_field(name="Equipos", value=str(evento.get("cantidad_equipos", 1)), inline=True)
+    embed.add_field(name="Cupos", value=armado.resumen_cupos(evento) + SEPARADOR, inline=False)
+
+    campos = _campos_armado(evento, con_iconos=True)
+    # Un embed admite 6000 caracteres en total y cada ícono personalizado ocupa
+    # ~50; con muchos inscritos se quitan los íconos para que el mensaje quepa.
+    if len(embed) + sum(len(n) + len(v) for n, v, _ in campos) > 5800:
+        campos = _campos_armado(evento, con_iconos=False)
+    for nombre, valor, inline in campos:
+        embed.add_field(name=nombre, value=valor, inline=inline)
 
 
 def construir_embed_evento(evento: dict) -> discord.Embed:
@@ -34,14 +110,19 @@ def construir_embed_evento(evento: dict) -> discord.Embed:
 
     es_grupal = evento["tipo_inscripcion"] == "grupal"
 
-    if es_grupal:
+    if evento["tipo_inscripcion"] == "armado":
+        _agregar_campos_armado(embed, evento)
+    elif es_grupal:
         embed.add_field(name="Tipo", value="👥 Grupal", inline=True)
         embed.add_field(name="Equipos", value=str(len(evento["equipos"])), inline=True)
 
-        for equipo in evento["equipos"]:
+        for posicion, equipo in enumerate(evento["equipos"], start=1):
             lineas = "\n".join(f"• **{i['rol']}** — {i['personaje']}" for i in equipo["integrantes"])
             embed.add_field(
-                name=f"🛡️ {equipo['nombre_equipo']} (por {equipo['nombre_discord']})",
+                name=(
+                    f"🛡️ Equipo #{numero_de_equipo(equipo, posicion)} — {equipo['nombre_equipo']} "
+                    f"(por {equipo['nombre_discord']})"
+                ),
                 value=lineas,
                 inline=True,
             )
@@ -86,6 +167,17 @@ async def _anunciar_inscripcion(client: discord.Client, evento: dict, texto: str
         pass
 
 
+async def anunciar_promovidos(client: discord.Client, antes: dict, despues: dict):
+    """Avisa en el canal de inscripciones qué suplentes pasaron a titulares."""
+    for p, c in armado.promovidos(antes, despues):
+        await _anunciar_inscripcion(
+            client,
+            despues,
+            f"⬆️ <@{p['user_id']}> pasa de suplente a titular de "
+            f"**{armado.NOMBRES_CATEGORIA[c]}** en **{despues['titulo']}**.",
+        )
+
+
 class EquipoRosterModal(discord.ui.Modal, title="Inscribir equipo (2/2)"):
     """Segundo paso de la inscripción grupal: composición del equipo."""
 
@@ -123,12 +215,14 @@ class EquipoRosterModal(discord.ui.Modal, title="Inscribir equipo (2/2)"):
 
         if ok:
             evento = storage.obtener_evento(self.evento_id)
+            numero_equipo = equipo["numero"]
             await _actualizar_mensaje_evento(interaction.client, evento)
             lineas = ", ".join(f"{i['rol']}: {i['personaje']}" for i in integrantes)
             await _anunciar_inscripcion(
                 interaction.client,
                 evento,
-                f"👥 Equipo **{self.nombre_equipo}** (por {interaction.user.mention}) se inscribió en "
+                f"👥 Equipo **#{numero_equipo} — {self.nombre_equipo}** "
+                f"(por {interaction.user.mention}) se inscribió en "
                 f"**{evento['titulo']}** — {lineas}.",
             )
 
@@ -170,6 +264,101 @@ class ContinuarEquipoView(discord.ui.View):
         await interaction.response.send_modal(EquipoRosterModal(self.evento_id, self.nombre_equipo))
 
 
+class DatosPersonajeModal(discord.ui.Modal, title="Datos del personaje"):
+    """Último paso de la inscripción a equipos armados."""
+
+    personaje = discord.ui.TextInput(label="Nombre del personaje", max_length=32, required=True)
+    ilvl = discord.ui.TextInput(label="Item level", placeholder="Ej: 639", max_length=6, required=True)
+    io = discord.ui.TextInput(label="Puntuación de Raider.IO", placeholder="Ej: 2850", max_length=8, required=True)
+
+    def __init__(self, evento_id: str, clase: str, especializacion: str):
+        super().__init__()
+        self.evento_id = evento_id
+        self.clase = clase
+        self.especializacion = especializacion
+
+    async def on_submit(self, interaction: discord.Interaction):
+        ilvl = armado.parsear_numero(self.ilvl.value, 1, 2000)
+        io = armado.parsear_numero(self.io.value, 0, 10000)
+        if ilvl is None or io is None:
+            campo = "Item level" if ilvl is None else "Raider.IO"
+            await interaction.response.send_message(
+                f"❌ El valor de **{campo}** no es un número válido. Vuelve a inscribirte.",
+                ephemeral=True,
+            )
+            return
+
+        participante = {
+            "user_id": interaction.user.id,
+            "nombre_discord": interaction.user.display_name,
+            "personaje": self.personaje.value.strip(),
+            "clase": self.clase,
+            "especializacion": self.especializacion,
+            "rol": rol_de(self.clase, self.especializacion),
+            "ilvl": ilvl,
+            "io": io,
+        }
+        ok, mensaje = storage.agregar_participante(self.evento_id, participante)
+        if not ok:
+            await interaction.response.send_message("❌ " + mensaje, ephemeral=True)
+            return
+
+        evento = storage.obtener_evento(self.evento_id)
+        c, posicion, cupo = armado.estado_inscrito(evento, interaction.user.id)
+        rol_txt = armado.NOMBRES_CATEGORIA[c]
+        if posicion > 0:
+            estado = f"titular de **{rol_txt}** ({posicion}/{cupo})"
+        else:
+            estado = f"**suplente** de **{rol_txt}** (posición {-posicion} en la lista de espera)"
+        await interaction.response.send_message(f"✅ Quedaste inscrito como {estado}.", ephemeral=True)
+
+        await _actualizar_mensaje_evento(interaction.client, evento)
+        await _anunciar_inscripcion(
+            interaction.client,
+            evento,
+            f"📋 {interaction.user.mention} se inscribió en **{evento['titulo']}** como "
+            f"{self.especializacion} {self.clase} ({participante['personaje']}, "
+            f"{ilvl} ilvl, {io} IO)" + ("." if posicion > 0 else " — suplente."),
+        )
+
+
+class EspecialidadArmadoSelect(discord.ui.Select):
+    def __init__(self, evento_id: str, clase: str):
+        opciones = [
+            discord.SelectOption(
+                label=especializacion,
+                value=especializacion,
+                emoji=icono_especializacion(clase, especializacion) or None,
+            )
+            for especializacion, _rol in CLASES[clase]
+        ]
+        super().__init__(placeholder="Selecciona tu especialización", options=opciones)
+        self.evento_id = evento_id
+        self.clase = clase
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(
+            DatosPersonajeModal(self.evento_id, self.clase, self.values[0])
+        )
+
+
+class ClaseArmadoSelect(discord.ui.Select):
+    def __init__(self, evento_id: str):
+        opciones = [
+            discord.SelectOption(label=clase, value=clase, emoji=icono_clase(clase) or None)
+            for clase in CLASES
+        ]
+        super().__init__(placeholder="Selecciona tu clase", options=opciones)
+        self.evento_id = evento_id
+
+    async def callback(self, interaction: discord.Interaction):
+        view = discord.ui.View(timeout=300)
+        view.add_item(EspecialidadArmadoSelect(self.evento_id, self.values[0]))
+        await interaction.response.edit_message(
+            content=f"Elige tu especialización de **{self.values[0]}**:", view=view
+        )
+
+
 class EventoView(discord.ui.View):
     """Vista persistente asociada a un evento concreto (custom_id incluye el id)."""
 
@@ -207,6 +396,17 @@ class EventoView(discord.ui.View):
 
         if evento["tipo_inscripcion"] == "grupal":
             await interaction.response.send_modal(NombreEquipoModal(self.evento_id))
+        elif evento["tipo_inscripcion"] == "armado":
+            if any(p["user_id"] == interaction.user.id for p in evento["participantes"]):
+                await interaction.response.send_message(
+                    "❌ Ya estás inscrito. Si quieres cambiar de personaje o rol, "
+                    "date de baja y vuelve a inscribirte.",
+                    ephemeral=True,
+                )
+                return
+            view = discord.ui.View(timeout=300)
+            view.add_item(ClaseArmadoSelect(self.evento_id))
+            await interaction.response.send_message("Elige tu clase:", view=view, ephemeral=True)
         else:
             participante = {"user_id": interaction.user.id, "nombre_discord": str(interaction.user)}
             ok, mensaje = storage.agregar_participante(self.evento_id, participante)
@@ -239,8 +439,11 @@ class EventoView(discord.ui.View):
             mensaje_error = "❌ No estabas inscrito en este evento."
 
         if quitado:
+            antes = evento
             evento = storage.obtener_evento(self.evento_id)
             await _actualizar_mensaje_evento(interaction.client, evento)
             await interaction.response.send_message(mensaje_ok, ephemeral=True)
+            if evento["tipo_inscripcion"] == "armado":
+                await anunciar_promovidos(interaction.client, antes, evento)
         else:
             await interaction.response.send_message(mensaje_error, ephemeral=True)

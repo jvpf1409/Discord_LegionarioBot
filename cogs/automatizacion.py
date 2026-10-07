@@ -10,6 +10,7 @@ from cogs.vistas import EventoView, construir_embed_evento
 from cogs.vistas_raid import RaidView, construir_embed_raid
 from utils import storage
 from utils.anuncios import anunciar_publicacion
+from utils.recordatorios import campos_recordatorio_extra
 from utils.tiempo import siguiente_ocurrencia_semanal
 
 logger = logging.getLogger(__name__)
@@ -168,7 +169,12 @@ class Automatizacion(commands.Cog):
             logger.warning("No se pudo publicar programación %s: %s", programacion["id"], exc)
             return
 
-        storage.actualizar_raid(raid_id, mensaje_id=mensaje.id)
+        storage.actualizar_raid(
+            raid_id,
+            mensaje_id=mensaje.id,
+            # Cada copia semanal hereda la anticipación del recordatorio extra de la plantilla.
+            **campos_recordatorio_extra(plantilla.get("recordatorio_extra_min"), inicio, ahora),
+        )
         guild = self.bot.get_guild(programacion["guild_id"])
         if guild:
             await anunciar_publicacion(self.bot, guild, "Raid", plantilla["titulo"], mensaje)
