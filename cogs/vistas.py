@@ -20,12 +20,23 @@ def _linea_inscrito_armado(p: dict, con_icono: bool = True) -> str:
     )
 
 
+# Línea "vacía" al final de un campo: Discord recorta los saltos de línea
+# finales, pero no un espacio de ancho cero, así que separa visualmente los títulos.
+SEPARADOR = "\n​"
+
+
 def _campos_armado(evento: dict, con_iconos: bool) -> list[tuple[str, str, bool]]:
     campos = []
 
-    def bloques(nombre: str, inscritos: list[dict]):
-        lineas = [_linea_inscrito_armado(p, con_iconos) for p in inscritos]
-        for i, bloque in enumerate(armado.dividir_en_campos(lineas)):
+    def bloques(nombre: str, inscritos: list[dict], prefijos: list[str] | None = None):
+        lineas = [
+            (prefijos[i] if prefijos else "") + _linea_inscrito_armado(p, con_iconos)
+            for i, p in enumerate(inscritos)
+        ]
+        partes = armado.dividir_en_campos(lineas, limite=1024 - len(SEPARADOR))
+        for i, bloque in enumerate(partes):
+            if i == len(partes) - 1:
+                bloque += SEPARADOR
             campos.append((nombre if i == 0 else f"{nombre} (cont.)", bloque, False))
 
     if evento["equipos"]:
@@ -44,17 +55,23 @@ def _campos_armado(evento: dict, con_iconos: bool) -> list[tuple[str, str, bool]
         bloques("Sin equipo", [p for p in evento["participantes"] if p["user_id"] not in en_equipo])
         return campos
 
-    for c, (titulares, suplentes) in armado.repartir(evento).items():
-        nombre = f"{armado.EMOJIS_CATEGORIA[c]} {armado.NOMBRES_CATEGORIA[c]}"
-        bloques(nombre, titulares)
-        bloques(f"{nombre} — suplentes", suplentes)
+    # Primero los titulares por rol; los suplentes, todos juntos al final.
+    reparto = armado.repartir(evento)
+    for c, (titulares, _) in reparto.items():
+        bloques(f"{armado.EMOJIS_CATEGORIA[c]} {armado.NOMBRES_CATEGORIA[c]}", titulares)
+    suplentes = [(c, p) for c, (_, lista) in reparto.items() for p in lista]
+    bloques(
+        "⏳ Suplentes",
+        [p for _, p in suplentes],
+        prefijos=[f"{armado.EMOJIS_CATEGORIA[c]} " for c, _ in suplentes],
+    )
     return campos
 
 
 def _agregar_campos_armado(embed: discord.Embed, evento: dict):
     embed.add_field(name="Tipo", value="🧩 Equipos armados", inline=True)
     embed.add_field(name="Equipos", value=str(evento.get("cantidad_equipos", 1)), inline=True)
-    embed.add_field(name="Cupos", value=armado.resumen_cupos(evento), inline=False)
+    embed.add_field(name="Cupos", value=armado.resumen_cupos(evento) + SEPARADOR, inline=False)
 
     campos = _campos_armado(evento, con_iconos=True)
     # Un embed admite 6000 caracteres en total y cada ícono personalizado ocupa
