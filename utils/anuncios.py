@@ -77,7 +77,7 @@ async def enviar_recordatorio(
         f"{item['canal_id']}/{item['mensaje_id']}"
     )
     contenido = (
-        f"recordatorio: **{tipo} {item['titulo']}** comienza "
+        f"recordatorio: **{item['titulo']}** comienza "
         f"<t:{item['fecha_hora_ts']}:R>. ¡No olviden prepararse!\n{enlace}"
     )
     return await _enviar(client, guild, contenido)
